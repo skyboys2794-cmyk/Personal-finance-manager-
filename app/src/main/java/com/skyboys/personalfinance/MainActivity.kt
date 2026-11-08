@@ -220,7 +220,7 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
     fun uploadSheets(token: String) {
         scope.launch(Dispatchers.IO) {
             try {
-                val backupData = FinanceBackupData(dao.allTransactions(), dao.allAccounts(), dao.allBudgets(), dao.allReminders())
+                val backupData = FinanceBackupData(dao.allTransactions(), dao.allAccounts(), dao.allBudgets(), dao.allReminders(), dao.allMerchantRules())
                 val result = GoogleSheetsBackupClient().createBackup(token, backupData)
                 withContext(Dispatchers.Main) { Toast.makeText(context, "Full Google Sheets backup created: " + result.spreadsheetUrl, Toast.LENGTH_LONG).show() }
             } catch (e: Exception) {
@@ -401,7 +401,7 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
                         try {
                             val bytes = withContext(Dispatchers.IO) { context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: byteArrayOf() }
                             val restored = withContext(Dispatchers.Default) { EncryptedBackup.restore(bytes, backupPassword.toCharArray()) }
-                            withContext(Dispatchers.IO) { dao.replaceAllData(restored.transactions, restored.accounts, restored.budgets, restored.reminders) }
+                            withContext(Dispatchers.IO) { dao.replaceAllData(restored.transactions, restored.accounts, restored.budgets, restored.reminders, restored.merchantRules) }
                             FinanceNotifications.scheduleBillChecks(context)
                             FinanceNotifications.scheduleRecurringTransactions(context)
                             Toast.makeText(context, "Restored ${restored.transactions.size} transactions, ${restored.accounts.size} accounts, ${restored.budgets.size} budgets and ${restored.reminders.size} reminders.", Toast.LENGTH_LONG).show()
