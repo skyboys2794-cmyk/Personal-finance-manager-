@@ -292,7 +292,7 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
             )
             1 -> ActivityList(Modifier.padding(padding), transactions, onEdit = { editingTransaction = it }, onDelete = { id -> scope.launch(Dispatchers.IO) { dao.delete(id) } })
             2 -> AccountManagementScreen(Modifier.padding(padding), accounts, dao)
-            3 -> ManagementScreen(dao)
+            3 -> ManagementScreen(dao, Modifier.padding(padding))
             else -> FinanceSettingsScreen(
                 modifier = Modifier.padding(padding),
                 onReports = { reportsDialog = true },
