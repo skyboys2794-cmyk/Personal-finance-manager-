@@ -651,7 +651,7 @@ private fun AddTransactionDialog(
         "WALLET" -> accounts.filter { it.type == "WALLET" }
         else -> accounts.filter { it.type == "BANK" || it.type == "WALLET" }
     }
-    if (accountId != null && eligibleAccounts.none { it.id == accountId }) accountId = eligibleAccounts.firstOrNull()?.id
+    val selectedAccountId = if (eligibleAccounts.any { it.id == accountId }) accountId else eligibleAccounts.firstOrNull()?.id
     val validAmount = amount.toBigDecimalOrNull()?.let { it.signum() > 0 && it.toDouble().isFinite() } == true
     fun methodLabel(value: String) = when (value) {
         "BANK_TRANSFER" -> "Bank transfer"
@@ -711,7 +711,7 @@ private fun AddTransactionDialog(
                 if (eligibleAccounts.isNotEmpty()) {
                     ExposedDropdownMenuBox(accountExpanded, { accountExpanded = it }) {
                         OutlinedTextField(
-                            value = eligibleAccounts.firstOrNull { it.id == accountId }?.name ?: "Select account",
+                            value = eligibleAccounts.firstOrNull { it.id == selectedAccountId }?.name ?: "Select account",
                             onValueChange = {}, readOnly = true, label = { Text("Account") },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(accountExpanded) },
                             modifier = Modifier.menuAnchor().fillMaxWidth()
@@ -748,7 +748,7 @@ private fun AddTransactionDialog(
         },
         confirmButton = {
             TextButton(enabled = title.isNotBlank() && validAmount, onClick = {
-                onSave(title.trim(), amount.toDouble(), type, category, accountId, method, tags, recurring, frequency)
+                onSave(title.trim(), amount.toDouble(), type, category, selectedAccountId, method, tags, recurring, frequency)
             }) { Text("Save") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
