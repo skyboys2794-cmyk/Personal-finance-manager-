@@ -1,5 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application
+    <uses-permission android:name="android.permission.INTERNET" />\n\n    <application
         android:allowBackup="false"
         android:label="Personal Finance"
         android:theme="@android:style/Theme.Material.Light.NoActionBar"
