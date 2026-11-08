@@ -15,9 +15,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ReceiptLong
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.*
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,6 +35,8 @@ import com.skyboys.personalfinance.data.FinanceDatabase
 import com.skyboys.personalfinance.data.FinanceTransaction
 import com.skyboys.personalfinance.reports.FinanceAnalytics
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -48,7 +52,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val dao = FinanceDatabase.get(this).financeDao()
         lifecycleScope.launch {
-            if (dao.observeAccountsSnapshotEmpty()) {
+            if (dao.allAccounts().isEmpty()) {
                 dao.insertAccount(FinanceAccount(name = "Cash wallet", type = "CASH"))
                 dao.insertAccount(FinanceAccount(name = "Primary bank", type = "BANK"))
             }
@@ -78,7 +82,7 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
     val accounts by dao.observeAccounts().collectAsStateWithLifecycle(initialValue = emptyList())
     var showAdd by remember { mutableStateOf(false) }
     var tab by remember { mutableStateOf(0) }
-    val summary = remember(transactions) { FinanceAnalytics.summarize(transactions) }
+    val summary = remember(transactions) { FinanceAnalytics.summarize(transactions) }\n    val scope = rememberCoroutineScope()
 
     Scaffold(
         containerColor = Color(0xFFF6F8F6),
@@ -196,7 +200,7 @@ private fun Dashboard(
         item {
             Text("Recent activity", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         }
-        items(transactions.take(4), key = { it.id }) { TransactionRow(it, {}) }
+        items(transactions.take(4), key = { it.id }) { TransactionRow(it) }
         if (transactions.isEmpty()) item { EmptyCard("No transactions yet", "Tap + to add your first income or expense.") }
     }
 }
@@ -232,13 +236,13 @@ private fun SpendingChart(categories: Map<String, Long>) {
 private fun ActivityList(modifier: Modifier, transactions: List<FinanceTransaction>, onDelete: (Long) -> Unit) {
     LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item { Text("All transactions", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
-        items(transactions, key = { it.id }) { TransactionRow(it, { onDelete(it.id) }) }
+        items(transactions, key = { it.id }) { TransactionRow(it) { onDelete(it.id) } }
         if (transactions.isEmpty()) item { EmptyCard("Nothing here yet", "Your saved transactions will appear here.") }
     }
 }
 
 @Composable
-private fun TransactionRow(transaction: FinanceTransaction, onDelete: () -> Unit) {
+private fun TransactionRow(transaction: FinanceTransaction, onDelete: (() -> Unit)? = null) {
     Card(shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
         Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(42.dp).clip(CircleShape).background(if (transaction.type == "INCOME") Mint else Color(0xFFFFEFEC)), contentAlignment = Alignment.Center) {
@@ -251,7 +255,7 @@ private fun TransactionRow(transaction: FinanceTransaction, onDelete: () -> Unit
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text((if (transaction.type == "INCOME") "+" else "−") + money(transaction.amountPaise), color = if (transaction.type == "INCOME") Forest else Coral, fontWeight = FontWeight.Bold)
-                if (onDelete !== {}) { /* deletion is exposed in the activity screen below */ }
+                if (onDelete != null) {\n                    IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, contentDescription = "Delete transaction", tint = Muted) }\n                }
             }
         }
     }
