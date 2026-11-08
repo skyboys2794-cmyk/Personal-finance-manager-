@@ -2,6 +2,8 @@ package com.skyboys.personalfinance
 
 import android.widget.Toast
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -194,6 +196,7 @@ private fun AccountActions(onEdit: () -> Unit, onDelete: () -> Unit) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AccountEditorDialog(account: FinanceAccount?, onDismiss: () -> Unit, onSave: (String, String, String, Long, Boolean, Long, Int) -> Unit) {
     var name by remember(account?.id) { mutableStateOf(account?.name.orEmpty()) }
@@ -203,14 +206,30 @@ private fun AccountEditorDialog(account: FinanceAccount?, onDismiss: () -> Unit,
     var include by remember(account?.id) { mutableStateOf(account?.isIncludedInNetWorth ?: true) }
     var limit by remember(account?.id) { mutableStateOf(((account?.creditLimitPaise ?: 0L) / 100.0).toString()) }
     var dueDay by remember(account?.id) { mutableStateOf(if (account == null || account.statementDueDay == 0) "" else account.statementDueDay.toString()) }
+    var typeExpanded by remember { mutableStateOf(false) }
     val parsed = balance.toBigDecimalOrNull()
     val parsedLimit = limit.toBigDecimalOrNull()
     AlertDialog(onDismissRequest=onDismiss, title={ Text(if (account == null) "Add account" else "Edit account") },
-        text={ Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(name,{name=it},label={Text("Account name")},singleLine=true)
-            OutlinedTextField(institution,{institution=it},label={Text("Bank / institution")},singleLine=true)
-            Row(horizontalArrangement=Arrangement.spacedBy(4.dp)) { listOf("BANK","CASH","CREDIT_CARD","WALLET").forEach { FilterChip(type==it,{type=it},label={Text(it.replace('_',' '))}) } }
-            OutlinedTextField(balance,{balance=it},label={Text(if(type=="CREDIT_CARD") "Opening balance (₹; outstanding is negative)" else "Opening balance (₹)")},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal),singleLine=true)
+        text={ Column(
+            Modifier.fillMaxWidth().heightIn(max = 440.dp).verticalScroll(rememberScrollState()),
+            verticalArrangement=Arrangement.spacedBy(8.dp)
+        ) {
+            OutlinedTextField(name,{name=it},label={Text("Account name")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+            OutlinedTextField(institution,{institution=it},label={Text("Bank / institution")},modifier=Modifier.fillMaxWidth(),singleLine=true)
+            ExposedDropdownMenuBox(typeExpanded,{typeExpanded=it}) {
+                OutlinedTextField(
+                    value=type.replace('_',' '), onValueChange={}, readOnly=true,
+                    label={Text("Account type")},
+                    trailingIcon={ExposedDropdownMenuDefaults.TrailingIcon(typeExpanded)},
+                    modifier=Modifier.menuAnchor().fillMaxWidth()
+                )
+                ExposedDropdownMenu(typeExpanded,{typeExpanded=false}) {
+                    listOf("BANK","CASH","CREDIT_CARD","WALLET").forEach { item ->
+                        DropdownMenuItem(text={Text(item.replace('_',' '))},onClick={type=item;typeExpanded=false})
+                    }
+                }
+            }
+            OutlinedTextField(balance,{balance=it},label={Text(if(type=="CREDIT_CARD") "Opening balance (₹; outstanding is negative)" else "Opening balance (₹)")},modifier=Modifier.fillMaxWidth(),keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal),singleLine=true)
             if (type == "CREDIT_CARD") {
                 OutlinedTextField(limit,{limit=it},label={Text("Credit limit (₹)")},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal),singleLine=true)
                 OutlinedTextField(dueDay,{dueDay=it.filter(Char::isDigit).take(2)},label={Text("Statement due day (1–31)")},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Number),singleLine=true)
