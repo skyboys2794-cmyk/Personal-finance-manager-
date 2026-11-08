@@ -37,13 +37,19 @@ private val MIGRATION_3_4 = object : Migration(3, 4) {
     }
 }
 
+private val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("CREATE TABLE IF NOT EXISTS merchant_category_rules (normalizedMerchant TEXT NOT NULL PRIMARY KEY, displayName TEXT NOT NULL, category TEXT NOT NULL, correctionCount INTEGER NOT NULL, updatedAtMillis INTEGER NOT NULL)")
+    }
+}
+
 private val MIGRATION_4_5 = object : Migration(4, 5) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("ALTER TABLE accounts ADD COLUMN balanceAsOfMillis INTEGER NOT NULL DEFAULT 0")
     }
 }
 
-@Database(entities = [FinanceTransaction::class, FinanceAccount::class, FinanceBudget::class, BillReminder::class], version = 5, exportSchema = false)
+@Database(entities = [FinanceTransaction::class, FinanceAccount::class, FinanceBudget::class, BillReminder::class, MerchantCategoryRule::class], version = 6, exportSchema = false)
 abstract class FinanceDatabase : RoomDatabase() {
     abstract fun financeDao(): FinanceDao
     companion object {
@@ -51,7 +57,7 @@ abstract class FinanceDatabase : RoomDatabase() {
         fun get(context: Context): FinanceDatabase =
             INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(context.applicationContext, FinanceDatabase::class.java, "personal-finance.db")
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5).build().also { INSTANCE = it }
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6).build().also { INSTANCE = it }
             }
     }
 }
