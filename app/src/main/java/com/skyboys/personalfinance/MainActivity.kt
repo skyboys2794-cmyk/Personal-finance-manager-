@@ -738,9 +738,12 @@ private fun AddTransactionDialog(
     val selectedAccountId = if (eligibleAccounts.any { it.id == accountId }) accountId else eligibleAccounts.firstOrNull()?.id
     val validAmount = amount.toBigDecimalOrNull()?.let { it.signum() > 0 && it.toDouble().isFinite() } == true
     fun methodLabel(value: String) = when (value) {
+        "UPI" -> "UPI"
+        "CASH" -> "Cash"
         "BANK_TRANSFER" -> "Bank transfer"
         "CARD" -> "Card"
-        else -> value.lowercase().replaceFirstChar { it.uppercase() }
+        "WALLET" -> "Wallet"
+        else -> value
     }
 
     AlertDialog(
