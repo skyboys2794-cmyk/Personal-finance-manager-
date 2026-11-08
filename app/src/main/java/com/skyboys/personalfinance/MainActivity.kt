@@ -114,6 +114,7 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
     var backupDialog by remember { mutableStateOf(false) }
     var backupMode by remember { mutableStateOf("export") }
     var backupPassword by remember { mutableStateOf("") }
+    var pendingRestoreUri by remember { mutableStateOf<android.net.Uri?>(null) }
     var customizeDashboard by remember { mutableStateOf(false) }
     var reportsDialog by remember { mutableStateOf(false) }
     var showSpending by remember { mutableStateOf(context.getSharedPreferences("dashboard_prefs", 0).getBoolean("show_spending", true)) }
@@ -247,16 +248,7 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
         }
     }
     val backupImporter = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) scope.launch {
-            try {
-                val bytes = withContext(Dispatchers.IO) { context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: byteArrayOf() }
-                val restored = withContext(Dispatchers.Default) { EncryptedBackup.restore(bytes, backupPassword.toCharArray()) }
-                withContext(Dispatchers.IO) { dao.replaceAllData(restored.transactions, restored.accounts, restored.budgets, restored.reminders) }
-                FinanceNotifications.scheduleBillChecks(context)
-                Toast.makeText(context, "Restored ${restored.transactions.size} transactions, ${restored.accounts.size} accounts, ${restored.budgets.size} budgets and ${restored.reminders.size} reminders.", Toast.LENGTH_LONG).show()
-            } catch (e: Exception) { Toast.makeText(context, "Restore failed. Check the password and backup file.", Toast.LENGTH_LONG).show() }
-            backupPassword = ""
-        }
+        if (uri != null) pendingRestoreUri = uri
     }
 
     Scaffold(
@@ -357,6 +349,36 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
                 }
             },
             confirmButton = { TextButton(onClick = { customizeDashboard = false }) { Text("Done") } }
+        )
+    }
+
+    if (pendingRestoreUri != null) {
+        AlertDialog(
+            onDismissRequest = { pendingRestoreUri = null; backupPassword = "" },
+            title = { Text("Replace existing finance data?") },
+            text = { Text("Restoring this backup will replace your current transactions, accounts, budgets and bill reminders. This cannot be undone. Create a backup of your current data first if you may need it.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    val uri = pendingRestoreUri
+                    pendingRestoreUri = null
+                    if (uri != null) scope.launch {
+                        try {
+                            val bytes = withContext(Dispatchers.IO) { context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: byteArrayOf() }
+                            val restored = withContext(Dispatchers.Default) { EncryptedBackup.restore(bytes, backupPassword.toCharArray()) }
+                            withContext(Dispatchers.IO) { dao.replaceAllData(restored.transactions, restored.accounts, restored.budgets, restored.reminders) }
+                            FinanceNotifications.scheduleBillChecks(context)
+                            FinanceNotifications.scheduleRecurringTransactions(context)
+                            Toast.makeText(context, "Restored ${restored.transactions.size} transactions, ${restored.accounts.size} accounts, ${restored.budgets.size} budgets and ${restored.reminders.size} reminders.", Toast.LENGTH_LONG).show()
+                        } catch (e: Exception) {
+                            Toast.makeText(context, "Restore failed. Check the password and backup file.", Toast.LENGTH_LONG).show()
+                        }
+                        backupPassword = ""
+                    }
+                }) { Text("Replace data") }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingRestoreUri = null; backupPassword = "" }) { Text("Cancel") }
+            }
         )
     }
 
