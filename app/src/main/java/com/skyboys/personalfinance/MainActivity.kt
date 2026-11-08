@@ -255,7 +255,7 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
     val backupExporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
         if (uri != null) scope.launch {
             try {
-                val bytes = withContext(Dispatchers.IO) { EncryptedBackup.export(FinanceBackupData(dao.allTransactions(), dao.allAccounts(), dao.allBudgets(), dao.allReminders()), backupPassword.toCharArray()) }
+                val bytes = withContext(Dispatchers.IO) { EncryptedBackup.export(FinanceBackupData(dao.allTransactions(), dao.allAccounts(), dao.allBudgets(), dao.allReminders(), dao.allMerchantRules()), backupPassword.toCharArray()) }
                 withContext(Dispatchers.IO) { context.contentResolver.openOutputStream(uri)?.use { it.write(bytes) } }
                 Toast.makeText(context, "Encrypted backup saved.", Toast.LENGTH_LONG).show()
             } catch (e: Exception) { Toast.makeText(context, "Backup failed: ${e.message}", Toast.LENGTH_LONG).show() }
