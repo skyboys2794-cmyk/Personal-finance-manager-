@@ -38,7 +38,7 @@ class FinanceNotificationCaptureService : NotificationListenerService() {
             runCatching {
                 val dao = FinanceDatabase.get(applicationContext).financeDao()
                 val accounts = dao.allAccounts()
-                val isCardSource = CARD_SOURCE_PACKAGES.contains(sbn.packageName)
+                val isCardSource = CARD_SOURCE_PACKAGES.contains(sbn.packageName) || parsed.paymentMethod == "CARD"
                 val preferredId = prefs.getLong(if (isCardSource) KEY_CARD_ACCOUNT_ID else KEY_ACCOUNT_ID, -1L).takeIf { it > 0L }
                 val preferredType = if (isCardSource) "CREDIT_CARD" else "BANK"
                 val accountId = accounts.firstOrNull { it.id == preferredId }?.id
@@ -151,8 +151,12 @@ internal object BankNotificationParser {
         val title = cleaned.takeIf { it.length >= 3 }?.take(90) ?: "Bank transaction"
         return ParsedBankNotification(
             title, paise, type, MerchantCategorizer.categoryFor(message),
-            if (message.contains("upi", true) || message.contains("phonepe", true) ||
-                message.contains("gpay", true) || message.contains("paytm", true)) "UPI" else "BANK_TRANSFER"
+            when {
+                Regex("""(?i)\\b(credit card|card ending|card purchase|credit card transaction)\\b""").containsMatchIn(message) -> "CARD"
+                message.contains("upi", true) || message.contains("phonepe", true) ||
+                    message.contains("gpay", true) || message.contains("paytm", true) -> "UPI"
+                else -> "BANK_TRANSFER"
+            }
         )
     }
 }
