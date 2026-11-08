@@ -14,5 +14,6 @@ data class FinanceTransaction(
     val accountId: Long? = null,
     val paymentMethod: String = "CASH",
     val tags: String = "",
-    val notes: String = ""
+    val notes: String = "",
+    val transferId: String? = null
 )
