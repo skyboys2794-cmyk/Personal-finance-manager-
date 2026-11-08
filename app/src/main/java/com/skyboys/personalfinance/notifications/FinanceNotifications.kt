@@ -117,14 +117,25 @@ class RecurringTransactionWorker(context: Context, params: WorkerParameters) : C
         val now = System.currentTimeMillis()
         dao.allTransactions().filter { it.isRecurring }.forEach { source ->
             var lastGenerated = preferences.getLong("last-generated-${source.id}", source.dateMillis)
-            var next = Calendar.getInstance().apply {
-                timeInMillis = lastGenerated
+            val originalDate = Calendar.getInstance().apply { timeInMillis = source.dateMillis }
+            fun nextOccurrence(fromMillis: Long): Calendar = Calendar.getInstance().apply {
+                timeInMillis = fromMillis
                 when (source.recurrenceFrequency.uppercase(Locale.ROOT)) {
                     "WEEKLY" -> add(Calendar.WEEK_OF_YEAR, 1)
-                    "YEARLY" -> add(Calendar.YEAR, 1)
-                    else -> add(Calendar.MONTH, 1)
+                    "YEARLY" -> {
+                        add(Calendar.YEAR, 1)
+                        set(Calendar.MONTH, originalDate.get(Calendar.MONTH))
+                        set(Calendar.DAY_OF_MONTH, 1)
+                        set(Calendar.DAY_OF_MONTH, minOf(originalDate.get(Calendar.DAY_OF_MONTH), getActualMaximum(Calendar.DAY_OF_MONTH)))
+                    }
+                    else -> {
+                        set(Calendar.DAY_OF_MONTH, 1)
+                        add(Calendar.MONTH, 1)
+                        set(Calendar.DAY_OF_MONTH, minOf(originalDate.get(Calendar.DAY_OF_MONTH), getActualMaximum(Calendar.DAY_OF_MONTH)))
+                    }
                 }
             }
+            var next = nextOccurrence(lastGenerated)
             var generated = 0
             while (next.timeInMillis <= now && generated < 24) {
                 val generatedTransaction = source.copy(id = 0, dateMillis = next.timeInMillis, isRecurring = false)
@@ -132,14 +143,7 @@ class RecurringTransactionWorker(context: Context, params: WorkerParameters) : C
                 BudgetAlertEvaluator.evaluate(applicationContext, generatedTransaction)
                 lastGenerated = next.timeInMillis
                 preferences.edit().putLong("last-generated-${source.id}", lastGenerated).commit()
-                next = Calendar.getInstance().apply {
-                    timeInMillis = lastGenerated
-                    when (source.recurrenceFrequency.uppercase(Locale.ROOT)) {
-                        "WEEKLY" -> add(Calendar.WEEK_OF_YEAR, 1)
-                        "YEARLY" -> add(Calendar.YEAR, 1)
-                        else -> add(Calendar.MONTH, 1)
-                    }
-                }
+                next = nextOccurrence(lastGenerated)
                 generated++
             }
         }
