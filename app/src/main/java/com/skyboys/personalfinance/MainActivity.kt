@@ -35,9 +35,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import com.skyboys.personalfinance.backup.EncryptedBackup
+import com.skyboys.personalfinance.backup.FinanceBackupData
 import com.skyboys.personalfinance.backup.GoogleSheetsBackupClient
 import com.google.android.gms.auth.api.identity.AuthorizationRequest
 import com.google.android.gms.auth.api.identity.Identity
@@ -102,6 +105,7 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
     var backupMode by remember { mutableStateOf("export") }
     var backupPassword by remember { mutableStateOf("") }
     var customizeDashboard by remember { mutableStateOf(false) }
+    var reportsDialog by remember { mutableStateOf(false) }
     var showSpending by remember { mutableStateOf(context.getSharedPreferences("dashboard_prefs", 0).getBoolean("show_spending", true)) }
     var showRecent by remember { mutableStateOf(context.getSharedPreferences("dashboard_prefs", 0).getBoolean("show_recent", true)) }
     val summary = remember(transactions) { FinanceAnalytics.summarize(transactions) }
@@ -161,7 +165,7 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
     val backupExporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
         if (uri != null) scope.launch {
             try {
-                val bytes = withContext(Dispatchers.IO) { EncryptedBackup.export(dao.allTransactions(), backupPassword.toCharArray()) }
+                val bytes = withContext(Dispatchers.IO) { EncryptedBackup.export(FinanceBackupData(dao.allTransactions(), dao.allAccounts(), dao.allBudgets(), dao.allReminders()), backupPassword.toCharArray()) }
                 withContext(Dispatchers.IO) { context.contentResolver.openOutputStream(uri)?.use { it.write(bytes) } }
                 Toast.makeText(context, "Encrypted backup saved.", Toast.LENGTH_LONG).show()
             } catch (e: Exception) { Toast.makeText(context, "Backup failed: ${e.message}", Toast.LENGTH_LONG).show() }
@@ -173,8 +177,9 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
             try {
                 val bytes = withContext(Dispatchers.IO) { context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: byteArrayOf() }
                 val restored = withContext(Dispatchers.Default) { EncryptedBackup.restore(bytes, backupPassword.toCharArray()) }
-                withContext(Dispatchers.IO) { dao.insertAll(restored) }
-                Toast.makeText(context, "Restored ${restored.size} transactions.", Toast.LENGTH_LONG).show()
+                withContext(Dispatchers.IO) { dao.replaceAllData(restored.transactions, restored.accounts, restored.budgets, restored.reminders) }
+                FinanceNotifications.scheduleBillChecks(context)
+                Toast.makeText(context, "Restored ${restored.transactions.size} transactions, ${restored.accounts.size} accounts, ${restored.budgets.size} budgets and ${restored.reminders.size} reminders.", Toast.LENGTH_LONG).show()
             } catch (e: Exception) { Toast.makeText(context, "Restore failed. Check the password and backup file.", Toast.LENGTH_LONG).show() }
             backupPassword = ""
         }
@@ -191,6 +196,7 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
                     }
                 },
                 actions = {
+                    TextButton(onClick = { reportsDialog = true }) { Text("Reports") }
                     TextButton(onClick = { csvPicker.launch(arrayOf("text/*", "application/vnd.ms-excel")) }) { Text("Import CSV") }
                     TextButton(onClick = { backupMode = "export"; backupDialog = true }) { Text("Backup") }
                     TextButton(onClick = { beginSheetsSync() }) { Text("Sheets") }
@@ -216,9 +222,7 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
         when (tab) {
             0 -> Dashboard(Modifier.padding(padding), transactions, summary.incomePaise, summary.expensePaise, summary.netCashFlowPaise, summary.expenseByCategory, showSpending, showRecent)
             1 -> ActivityList(Modifier.padding(padding), transactions) { id -> scope.launch(Dispatchers.IO) { dao.delete(id) } }
-            2 -> AccountsList(Modifier.padding(padding), accounts, dao) { name, institution, type, balance ->
-                scope.launch(Dispatchers.IO) { dao.insertAccount(FinanceAccount(name = name, institution = institution, type = type, openingBalancePaise = (balance * 100).toLong())) }
-            }
+            2 -> AccountManagementScreen(Modifier.padding(padding), accounts, dao)
             else -> ManagementScreen(dao)
         }
     }
@@ -259,7 +263,7 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
             title = { Text(if (backupMode == "export") "Create encrypted backup" else "Restore backup") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text("Your transaction history is encrypted on your device before saving. Keep this password safe; it cannot be recovered.")
+                    Text("Your complete finance data (transactions, accounts, budgets and bill reminders) is encrypted before saving. Restore replaces the current dataset. Keep this password safe; it cannot be recovered.")
                     OutlinedTextField(
                         value = backupPassword, onValueChange = { backupPassword = it },
                         label = { Text("Backup password (10+ characters)") },
@@ -283,6 +287,19 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
             }
         )
     }
+    if (reportsDialog) {
+        Dialog(onDismissRequest = { reportsDialog = false }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+            Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                Column {
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), horizontalArrangement = Arrangement.End) {
+                        TextButton(onClick = { reportsDialog = false }) { Text("Close reports") }
+                    }
+                    AdvancedReports(Modifier.weight(1f).fillMaxWidth(), transactions)
+                }
+            }
+        }
+    }
+
 }
 
 @Composable
