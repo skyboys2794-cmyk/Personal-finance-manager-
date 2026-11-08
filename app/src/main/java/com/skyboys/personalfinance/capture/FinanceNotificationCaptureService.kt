@@ -46,7 +46,13 @@ class FinanceNotificationCaptureService : NotificationListenerService() {
                     ?: accounts.firstOrNull { it.type == preferredType }?.id
                     ?: accounts.firstOrNull { it.type == "WALLET" }?.id
                 val transactionTime = sbn.postTime.takeIf { it > 0L } ?: System.currentTimeMillis()
-                val learnedCategory = MerchantMemory.learnedCategory(dao, parsed.title) ?: parsed.category
+                val learnedCategory = MerchantMemory.learnedCategory(dao, parsed.title)
+                val resolvedCategory = learnedCategory ?: parsed.category
+                val categorySource = when {
+                    learnedCategory != null -> "USER_LEARNED_CATEGORY"
+                    resolvedCategory == "Other" -> "CATEGORY_REVIEW"
+                    else -> "AUTO_CATEGORIZED"
+                }
                 val duplicate = dao.allTransactions().any { item ->
                     item.amountPaise == parsed.amountPaise && item.type == parsed.type &&
                         abs(item.dateMillis - transactionTime) <= 90_000L && item.tags.contains(TAG_CAPTURE)
@@ -54,9 +60,9 @@ class FinanceNotificationCaptureService : NotificationListenerService() {
                 if (!duplicate) {
                     dao.insert(FinanceTransaction(
                         title = parsed.title, amountPaise = parsed.amountPaise, type = parsed.type,
-                        category = learnedCategory, dateMillis = transactionTime, accountId = accountId,
+                        category = resolvedCategory, dateMillis = transactionTime, accountId = accountId,
                         paymentMethod = parsed.paymentMethod,
-                        tags = "$TAG_CAPTURE;SOURCE=${sbn.packageName};${if (learnedCategory != "Other") "USER_LEARNED_CATEGORY" else "CATEGORY_REVIEW"}",
+                        tags = "$TAG_CAPTURE;SOURCE=${sbn.packageName};${categorySource}",
                         notes = "Captured locally from an app notification"
                     ))
                 }
