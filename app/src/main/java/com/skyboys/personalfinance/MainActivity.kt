@@ -87,7 +87,7 @@ class MainActivity : ComponentActivity() {
             MaterialTheme(
                 colorScheme = lightColorScheme(
                     primary = Forest, onPrimary = Color.White, primaryContainer = Mint,
-                    secondary = Color(0xFFB7D8C8), background = Color(0xFFF6F8F6),
+                    secondary = Color(0xFFB7D8C8), background = Canvas,
                     surface = Color.White, onSurface = Ink, error = Coral
                 )
             ) { FinanceApp(dao) }
@@ -198,7 +198,7 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
                         Text("Finance Assistant", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFF6F8F6))
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Canvas)
             )
         },
         bottomBar = {
@@ -332,6 +332,9 @@ private fun Dashboard(modifier: Modifier, transactions: List<FinanceTransaction>
                         SummaryMetric("Income", income, Color(0xFFBDE8D2), Modifier.weight(1f))
                         SummaryMetric("Spent", expenses, Color(0xFFFFC9BD), Modifier.weight(1f))
                     }
+                    Spacer(Modifier.height(14.dp))
+                    Text("TOTAL NET WORTH", color = Color(0xFFBBD0F4), style = MaterialTheme.typography.labelSmall)
+                    Text(money(FinanceAnalytics.netWorth(accounts, transactions)), color = Color.White, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                 }
             }
         }
