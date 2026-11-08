@@ -46,13 +46,14 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PdfStatementImportDialog(dao: FinanceDao, onDismiss: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val accounts by dao.observeAccounts().collectAsState(initial = emptyList())
     var selectedAccountId by remember { mutableStateOf<Long?>(null) }
-    LaunchedEffect(accounts) { if (selectedAccountId == null) selectedAccountId = accounts.firstOrNull { it.type == "BANK" }?.id }
+    LaunchedEffect(accounts) { if (selectedAccountId == null) selectedAccountId = accounts.firstOrNull { it.type != "CREDIT_CARD" }?.id }
     var accountMenu by remember { mutableStateOf(false) }
     var selectedUri by remember { mutableStateOf<android.net.Uri?>(null) }
     var password by remember { mutableStateOf("") }
