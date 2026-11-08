@@ -31,6 +31,11 @@ jobs:
       - name: Run JVM unit tests
         run: gradle --no-daemon testDebugUnitTest
 
+      # Catch Android instrumentation test compilation errors before spending
+      # time booting the emulator.
+      - name: Compile Android instrumentation tests
+        run: gradle --no-daemon compileDebugAndroidTestKotlin
+
       # Produce the installable APK before emulator UI tests. A slow or
       # unavailable emulator must not prevent a valid APK from being uploaded.
       - name: Build debug APK
