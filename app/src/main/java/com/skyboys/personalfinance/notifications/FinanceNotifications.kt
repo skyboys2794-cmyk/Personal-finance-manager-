@@ -47,6 +47,13 @@ object FinanceNotifications {
             "personal_finance_bill_reminders", ExistingPeriodicWorkPolicy.KEEP, request
         )
     }
+
+    fun scheduleRecurringTransactions(context: Context) {
+        val request = PeriodicWorkRequestBuilder<RecurringTransactionWorker>(24, TimeUnit.HOURS).build()
+        WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+            "personal_finance_recurring_transactions", ExistingPeriodicWorkPolicy.KEEP, request
+        )
+    }
 }
 
 class BillReminderWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
@@ -100,5 +107,42 @@ object BudgetAlertEvaluator {
                 prefs.edit().putBoolean(key, true).apply()
             }
         }
+    }
+}
+
+class RecurringTransactionWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
+    override suspend fun doWork(): Result = try {
+        val dao = FinanceDatabase.get(applicationContext).financeDao()
+        val preferences = applicationContext.getSharedPreferences("recurring_schedule_state", Context.MODE_PRIVATE)
+        val now = System.currentTimeMillis()
+        dao.allTransactions().filter { it.isRecurring }.forEach { source ->
+            var lastGenerated = preferences.getLong("last-generated-${source.id}", source.dateMillis)
+            var next = Calendar.getInstance().apply {
+                timeInMillis = lastGenerated
+                when (source.recurrenceFrequency.uppercase(Locale.ROOT)) {
+                    "WEEKLY" -> add(Calendar.WEEK_OF_YEAR, 1)
+                    "YEARLY" -> add(Calendar.YEAR, 1)
+                    else -> add(Calendar.MONTH, 1)
+                }
+            }
+            var generated = 0
+            while (next.timeInMillis <= now && generated < 24) {
+                dao.insert(source.copy(id = 0, dateMillis = next.timeInMillis, isRecurring = false))
+                lastGenerated = next.timeInMillis
+                preferences.edit().putLong("last-generated-${source.id}", lastGenerated).commit()
+                next = Calendar.getInstance().apply {
+                    timeInMillis = lastGenerated
+                    when (source.recurrenceFrequency.uppercase(Locale.ROOT)) {
+                        "WEEKLY" -> add(Calendar.WEEK_OF_YEAR, 1)
+                        "YEARLY" -> add(Calendar.YEAR, 1)
+                        else -> add(Calendar.MONTH, 1)
+                    }
+                }
+                generated++
+            }
+        }
+        Result.success()
+    } catch (_: Exception) {
+        Result.retry()
     }
 }
