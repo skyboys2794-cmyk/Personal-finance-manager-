@@ -165,7 +165,7 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
         when (tab) {
             0 -> Dashboard(Modifier.padding(padding), transactions, summary.incomePaise, summary.expensePaise, summary.netCashFlowPaise, summary.expenseByCategory)
             1 -> ActivityList(Modifier.padding(padding), transactions) { id -> scope.launch(Dispatchers.IO) { dao.delete(id) } }
-            tab == 2 -> AccountsList(Modifier.padding(padding), accounts)
+            tab == 2 -> AccountsList(Modifier.padding(padding), accounts, dao) { name, institution, type, balance ->\n                scope.launch(Dispatchers.IO) { dao.insertAccount(FinanceAccount(name = name, institution = institution, type = type, openingBalancePaise = (balance * 100).toLong())) }\n            }
             else -> ManagementScreen(dao)
         }
     }
