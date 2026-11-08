@@ -83,12 +83,6 @@ class MainActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 701)
         }
-        lifecycleScope.launch(Dispatchers.IO) {
-            if (dao.allAccounts().isEmpty()) {
-                dao.insertAccount(FinanceAccount(name = "Cash wallet", type = "CASH"))
-                dao.insertAccount(FinanceAccount(name = "Primary bank", type = "BANK"))
-            }
-        }
         setContent {
             MaterialTheme(
                 colorScheme = lightColorScheme(
@@ -110,7 +104,7 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
     val scope = rememberCoroutineScope()
     var showAdd by remember { mutableStateOf(false) }
     var editingTransaction by remember { mutableStateOf<FinanceTransaction?>(null) }
-    var tab by remember { mutableStateOf(0) }
+    var tab by remember { mutableStateOf(if (accounts.isEmpty()) 2 else 0) }
     var backupDialog by remember { mutableStateOf(false) }
     var pdfStatementImport by remember { mutableStateOf(false) }
     var autoCaptureSettings by remember { mutableStateOf(false) }
