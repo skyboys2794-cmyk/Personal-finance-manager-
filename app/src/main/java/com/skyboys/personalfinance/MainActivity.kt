@@ -723,6 +723,7 @@ private fun AddTransactionDialog(
     var categoryExpanded by remember { mutableStateOf(false) }
     var methodExpanded by remember { mutableStateOf(false) }
     var accountExpanded by remember { mutableStateOf(false) }
+    var frequencyExpanded by remember { mutableStateOf(false) }
     var moreOptions by remember { mutableStateOf(false) }
     val categories = listOf("Food", "Travel", "Bills", "Shopping", "Health", "Salary", "Business", "Other")
     val methods = listOf("UPI", "CASH", "CARD", "BANK_TRANSFER", "WALLET")
@@ -820,9 +821,22 @@ private fun AddTransactionDialog(
                         Checkbox(checked = recurring, onCheckedChange = { recurring = it })
                         Text("Track as recurring")
                     }
-                    if (recurring) Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        listOf("WEEKLY", "MONTHLY", "YEARLY").forEach { item ->
-                            FilterChip(selected = frequency == item, onClick = { frequency = item }, label = { Text(item.lowercase().replaceFirstChar { it.uppercase() }) })
+                    if (recurring) {
+                        ExposedDropdownMenuBox(frequencyExpanded, { frequencyExpanded = it }) {
+                            OutlinedTextField(
+                                value = frequency.lowercase().replaceFirstChar { it.uppercase() },
+                                onValueChange = {}, readOnly = true, label = { Text("Repeat frequency") },
+                                trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(frequencyExpanded) },
+                                modifier = Modifier.menuAnchor().fillMaxWidth()
+                            )
+                            ExposedDropdownMenu(frequencyExpanded, { frequencyExpanded = false }) {
+                                listOf("WEEKLY", "MONTHLY", "YEARLY").forEach { item ->
+                                    DropdownMenuItem(
+                                        text = { Text(item.lowercase().replaceFirstChar { it.uppercase() }) },
+                                        onClick = { frequency = item; frequencyExpanded = false }
+                                    )
+                                }
+                            }
                         }
                     }
                 }
