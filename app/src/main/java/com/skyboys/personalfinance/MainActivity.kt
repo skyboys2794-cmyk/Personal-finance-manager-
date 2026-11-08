@@ -104,7 +104,11 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
     val scope = rememberCoroutineScope()
     var showAdd by remember { mutableStateOf(false) }
     var editingTransaction by remember { mutableStateOf<FinanceTransaction?>(null) }
-    var tab by remember { mutableStateOf(if (accounts.isEmpty()) 2 else 0) }
+    var tab by remember { mutableStateOf(0) }
+    LaunchedEffect(Unit) {
+        val hasSavedAccounts = withContext(Dispatchers.IO) { dao.allAccounts().isNotEmpty() }
+        if (!hasSavedAccounts) tab = 2
+    }
     var backupDialog by remember { mutableStateOf(false) }
     var pdfStatementImport by remember { mutableStateOf(false) }
     var autoCaptureSettings by remember { mutableStateOf(false) }
