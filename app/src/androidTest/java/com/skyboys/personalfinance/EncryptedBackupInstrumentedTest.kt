@@ -7,6 +7,7 @@ import com.skyboys.personalfinance.data.BillReminder
 import com.skyboys.personalfinance.data.FinanceAccount
 import com.skyboys.personalfinance.data.FinanceBudget
 import com.skyboys.personalfinance.data.FinanceTransaction
+import com.skyboys.personalfinance.data.MerchantCategoryRule
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -18,7 +19,8 @@ class EncryptedBackupInstrumentedTest {
             transactions=listOf(FinanceTransaction(title="Groceries", amountPaise=12500, type="EXPENSE", category="Food")),
             accounts=listOf(FinanceAccount(id=12, name="Primary bank", openingBalancePaise=750000, balanceAsOfMillis=1_799_000_000_000L)),
             budgets=listOf(FinanceBudget(id=4, category="Food", limitPaise=50000, monthKey="2026-11")),
-            reminders=listOf(BillReminder(id=7, title="Electricity", amountPaise=200000, dueDay=12))
+            reminders=listOf(BillReminder(id=7, title="Electricity", amountPaise=200000, dueDay=12)),
+            merchantRules=listOf(MerchantCategoryRule("swiggy", "Swiggy", "Food", 3, 1_800_000_000_000L))
         )
         val bytes = EncryptedBackup.export(source, "StrongBackupPass123".toCharArray())
         val restored = EncryptedBackup.restore(bytes, "StrongBackupPass123".toCharArray())
@@ -29,6 +31,8 @@ class EncryptedBackupInstrumentedTest {
         assertEquals(1_799_000_000_000L, restored.accounts.first().balanceAsOfMillis)
         assertEquals(50000L, restored.budgets.first().limitPaise)
         assertEquals("Electricity", restored.reminders.first().title)
+        assertEquals("Food", restored.merchantRules.first().category)
+        assertEquals(3, restored.merchantRules.first().correctionCount)
     }
 
     @Test(expected = Exception::class)
