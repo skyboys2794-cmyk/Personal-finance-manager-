@@ -294,6 +294,7 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
             2 -> AccountManagementScreen(Modifier.padding(padding), accounts, dao)
             3 -> ManagementScreen(dao)
             else -> FinanceSettingsScreen(
+                modifier = Modifier.padding(padding),
                 onReports = { reportsDialog = true },
                 onImportCsv = { csvPicker.launch(arrayOf("text/*", "application/vnd.ms-excel")) },
                 onBackup = { backupMode = "export"; backupDialog = true },
