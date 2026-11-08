@@ -50,14 +50,14 @@ fun FinanceSettingsScreen(
         item { SettingsSectionLabel("AUTOMATION") }
         item { SettingsActionCard("Automatic transaction capture", "Capture selected payment notifications and categorize locally", onAutoCapture, Icons.Default.FileUpload) }
         item { SettingsSectionLabel("CONNECTIONS") }
-        item { SettingsActionCard("Google Sheets snapshot", "Manually export transaction rows to Google Sheets", onSheets, Icons.Default.CloudUpload) }
+        item { SettingsActionCard("Google Sheets backup", "Export transactions, accounts, cards, budgets and bills to a readable spreadsheet", onSheets, Icons.Default.CloudUpload) }
         item { SettingsSectionLabel("PERSONALIZATION") }
         item { SettingsActionCard("Customize dashboard", "Choose which overview sections are visible", onCustomize, Icons.Default.Palette) }
         item {
             Surface(shape = RoundedCornerShape(18.dp), color = Color(0xFFE8F5F1), modifier = Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("Your data stays on this device", fontWeight = FontWeight.SemiBold, color = Color(0xFF087F73))
-                    Text("Backups are encrypted before export. Google Sheets creates a manual transaction snapshot; it does not sync bank accounts automatically.", style = MaterialTheme.typography.bodySmall, color = Color(0xFF536B69))
+                    Text("Backups are encrypted before export. Google Sheets creates a manual full-finance backup after you authorize it. Automatic and two-way sync are not enabled yet.", style = MaterialTheme.typography.bodySmall, color = Color(0xFF536B69))
                 }
             }
         }
