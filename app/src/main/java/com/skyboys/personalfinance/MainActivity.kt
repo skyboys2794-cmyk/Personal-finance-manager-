@@ -219,8 +219,9 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
     fun uploadSheets(token: String) {
         scope.launch(Dispatchers.IO) {
             try {
-                val result = GoogleSheetsBackupClient().createBackup(token, dao.allTransactions())
-                withContext(Dispatchers.Main) { Toast.makeText(context, "Google Sheets backup created: " + result.spreadsheetUrl, Toast.LENGTH_LONG).show() }
+                val backupData = FinanceBackupData(dao.allTransactions(), dao.allAccounts(), dao.allBudgets(), dao.allReminders())
+                val result = GoogleSheetsBackupClient().createBackup(token, backupData)
+                withContext(Dispatchers.Main) { Toast.makeText(context, "Full Google Sheets backup created: " + result.spreadsheetUrl, Toast.LENGTH_LONG).show() }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) { Toast.makeText(context, "Google Sheets backup failed: " + e.message, Toast.LENGTH_LONG).show() }
             }
