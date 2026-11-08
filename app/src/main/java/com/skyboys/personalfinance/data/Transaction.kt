@@ -10,5 +10,9 @@ data class FinanceTransaction(
     val amountPaise: Long,
     val type: String,
     val category: String,
-    val dateMillis: Long = System.currentTimeMillis()
+    val dateMillis: Long = System.currentTimeMillis(),
+    val accountId: Long? = null,
+    val paymentMethod: String = "CASH",
+    val tags: String = "",
+    val notes: String = ""
 )
