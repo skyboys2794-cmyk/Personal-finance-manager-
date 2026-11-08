@@ -121,7 +121,10 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
                 val importedCount = withContext(Dispatchers.IO) {
                     val existing = dao.allTransactions().map { "${it.dateMillis}|${it.title.lowercase(Locale.ROOT)}|${it.amountPaise}|${it.type}" }.toMutableSet()
                     val unique = parsed.transactions.filter { existing.add("${it.dateMillis}|${it.title.lowercase(Locale.ROOT)}|${it.amountPaise}|${it.type}") }
-                    if (unique.isNotEmpty()) dao.insertAll(unique)
+                    if (unique.isNotEmpty()) {
+                        dao.insertAll(unique)
+                        unique.forEach { BudgetAlertEvaluator.evaluate(context, it) }
+                    }
                     unique.size
                 }
                 val skipped = parsed.errors.size + parsed.transactions.size - importedCount
