@@ -27,8 +27,8 @@ interface FinanceDao {
     suspend fun allAccounts(): List<FinanceAccount>
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertAccount(account: FinanceAccount): Long
-    @Query("UPDATE accounts SET name=:name, institution=:institution, type=:type, openingBalancePaise=:openingBalancePaise, currency=:currency, isIncludedInNetWorth=:isIncludedInNetWorth WHERE id=:id")
-    suspend fun updateAccount(id: Long, name: String, institution: String, type: String, openingBalancePaise: Long, currency: String, isIncludedInNetWorth: Boolean)
+    @Query("UPDATE accounts SET name=:name, institution=:institution, type=:type, openingBalancePaise=:openingBalancePaise, currency=:currency, isIncludedInNetWorth=:isIncludedInNetWorth, creditLimitPaise=:creditLimitPaise, statementDueDay=:statementDueDay WHERE id=:id")
+    suspend fun updateAccount(id: Long, name: String, institution: String, type: String, openingBalancePaise: Long, currency: String, isIncludedInNetWorth: Boolean, creditLimitPaise: Long, statementDueDay: Int)
     @Query("SELECT COUNT(*) FROM transactions WHERE accountId=:accountId")
     suspend fun countTransactionsForAccount(accountId: Long): Int
     @Query("UPDATE transactions SET accountId=NULL WHERE accountId=:accountId")
