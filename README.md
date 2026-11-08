@@ -1,24 +1,35 @@
-# Personal Finance Manager Android App
+# Personal Finance Manager
 
-An offline-first, single-user personal finance manager for Android.
+An offline-first Android app for tracking personal income and expenses.
 
-## Project goals
+## Initial features
 
-- Record income, expenses, transfers, and account balances manually.
-- Import bank statements from supported CSV files.
-- View dashboard summaries, category breakdowns, and transaction history.
-- Store financial data securely on-device using encrypted local storage.
-- Optionally synchronize selected data with Google Sheets.
-- Build a debug Android APK automatically with GitHub Actions.
+- Record income and expenses in Indian rupees (₹).
+- View total balance, income, and expenses.
+- Categorize transactions.
+- Review and delete recent transactions.
+- Store transactions locally with Room; no account or server required.
+- Build a debug APK automatically through GitHub Actions.
 
-## Design constraints
+## Build the APK
 
-- Android APK is the target deliverable.
-- Single-user app; no account or hosted-backend requirement.
-- Offline-first: core finance features work without an internet connection.
-- Google Sheets sync is optional and requires explicit user configuration.
-- Never commit credentials, API keys, or personal financial data to this repository.
+The workflow runs on pushes to `main`, pull requests, and manual dispatches.
 
-## Build
+1. Open the repository's **Actions** tab.
+2. Select **Android debug APK**.
+3. Open the latest successful run.
+4. Download the `personal-finance-manager-debug-apk` artifact.
 
-The Android project and automated APK workflow will be added in subsequent commits. The debug APK will be published as a downloadable GitHub Actions artifact.
+The workflow uses JDK 17 and Gradle 8.9. The APK output is `app/build/outputs/apk/debug/app-debug.apk`.
+
+## Data and privacy
+
+Transaction data is stored locally in the app's Room database. Android backup is disabled in this initial version. Do not add real financial records, passwords, API keys, or credentials to the Git repository.
+
+## Planned enhancements
+
+- Monthly reports and charts.
+- CSV bank-statement import and export.
+- Multiple accounts and transfers.
+- Budget limits and recurring transactions.
+- Optional, user-configured cloud backup.
