@@ -36,8 +36,8 @@ interface FinanceDao {
     suspend fun allAccounts(): List<FinanceAccount>
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insertAccount(account: FinanceAccount): Long
-    @Query("UPDATE accounts SET name=:name, institution=:institution, type=:type, openingBalancePaise=:openingBalancePaise, currency=:currency, isIncludedInNetWorth=:isIncludedInNetWorth, creditLimitPaise=:creditLimitPaise, statementDueDay=:statementDueDay WHERE id=:id")
-    suspend fun updateAccount(id: Long, name: String, institution: String, type: String, openingBalancePaise: Long, currency: String, isIncludedInNetWorth: Boolean, creditLimitPaise: Long, statementDueDay: Int)
+    @Query("UPDATE accounts SET name=:name, institution=:institution, type=:type, openingBalancePaise=:openingBalancePaise, currency=:currency, isIncludedInNetWorth=:isIncludedInNetWorth, creditLimitPaise=:creditLimitPaise, statementDueDay=:statementDueDay, balanceAsOfMillis=:balanceAsOfMillis WHERE id=:id")
+    suspend fun updateAccount(id: Long, name: String, institution: String, type: String, openingBalancePaise: Long, currency: String, isIncludedInNetWorth: Boolean, creditLimitPaise: Long, statementDueDay: Int, balanceAsOfMillis: Long)
     @Query("SELECT COUNT(*) FROM transactions WHERE accountId=:accountId")
     suspend fun countTransactionsForAccount(accountId: Long): Int
     @Query("UPDATE transactions SET accountId=NULL WHERE accountId=:accountId")
@@ -79,9 +79,22 @@ interface FinanceDao {
     @Query("SELECT * FROM transactions WHERE dateMillis >= :start AND dateMillis < :end")
     suspend fun transactionsBetween(start: Long, end: Long): List<FinanceTransaction>
 
+    @Query("SELECT * FROM merchant_category_rules WHERE normalizedMerchant=:normalizedMerchant LIMIT 1")
+    suspend fun merchantRule(normalizedMerchant: String): MerchantCategoryRule?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun saveMerchantRule(rule: MerchantCategoryRule)
+
+    @Query("SELECT * FROM merchant_category_rules ORDER BY updatedAtMillis DESC")
+    fun observeMerchantRules(): Flow<List<MerchantCategoryRule>>
+
+    @Query("SELECT * FROM merchant_category_rules ORDER BY normalizedMerchant")
+    suspend fun allMerchantRules(): List<MerchantCategoryRule>
+
     @Transaction
-    suspend fun replaceAllData(transactions: List<FinanceTransaction>, accounts: List<FinanceAccount>, budgets: List<FinanceBudget>, reminders: List<BillReminder>) {
+    suspend fun replaceAllData(transactions: List<FinanceTransaction>, accounts: List<FinanceAccount>, budgets: List<FinanceBudget>, reminders: List<BillReminder>, merchantRules: List<MerchantCategoryRule>) {
         clearTransactions()
+        clearMerchantCategoryRules()
         clearAccounts()
         clearBudgets()
         clearReminders()
@@ -89,14 +102,17 @@ interface FinanceDao {
         if (transactions.isNotEmpty()) insertTransactionsForRestore(transactions)
         if (budgets.isNotEmpty()) insertBudgetsForRestore(budgets)
         if (reminders.isNotEmpty()) insertRemindersForRestore(reminders)
+        if (merchantRules.isNotEmpty()) insertMerchantRulesForRestore(merchantRules)
     }
 
     @Query("DELETE FROM transactions") suspend fun clearTransactions()
     @Query("DELETE FROM accounts") suspend fun clearAccounts()
     @Query("DELETE FROM budgets") suspend fun clearBudgets()
     @Query("DELETE FROM bill_reminders") suspend fun clearReminders()
+    @Query("DELETE FROM merchant_category_rules") suspend fun clearMerchantCategoryRules()
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insertAccountsForRestore(items: List<FinanceAccount>)
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insertTransactionsForRestore(items: List<FinanceTransaction>)
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insertBudgetsForRestore(items: List<FinanceBudget>)
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insertRemindersForRestore(items: List<BillReminder>)
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insertMerchantRulesForRestore(items: List<MerchantCategoryRule>)
 }

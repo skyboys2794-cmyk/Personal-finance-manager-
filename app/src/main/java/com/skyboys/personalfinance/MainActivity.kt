@@ -53,6 +53,7 @@ import com.google.android.gms.common.api.Scope
 import com.skyboys.personalfinance.data.FinanceAccount
 import com.skyboys.personalfinance.data.FinanceDatabase
 import com.skyboys.personalfinance.data.FinanceTransaction
+import com.skyboys.personalfinance.categorization.MerchantMemory
 import com.skyboys.personalfinance.importer.CsvTransactionParser
 import com.skyboys.personalfinance.reports.FinanceAnalytics
 import com.skyboys.personalfinance.notifications.FinanceNotifications
@@ -83,12 +84,6 @@ class MainActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 701)
         }
-        lifecycleScope.launch(Dispatchers.IO) {
-            if (dao.allAccounts().isEmpty()) {
-                dao.insertAccount(FinanceAccount(name = "Cash wallet", type = "CASH"))
-                dao.insertAccount(FinanceAccount(name = "Primary bank", type = "BANK"))
-            }
-        }
         setContent {
             MaterialTheme(
                 colorScheme = lightColorScheme(
@@ -111,6 +106,10 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
     var showAdd by remember { mutableStateOf(false) }
     var editingTransaction by remember { mutableStateOf<FinanceTransaction?>(null) }
     var tab by remember { mutableStateOf(0) }
+    LaunchedEffect(Unit) {
+        val hasSavedAccounts = withContext(Dispatchers.IO) { dao.allAccounts().isNotEmpty() }
+        if (!hasSavedAccounts) tab = 2
+    }
     var backupDialog by remember { mutableStateOf(false) }
     var pdfStatementImport by remember { mutableStateOf(false) }
     var autoCaptureSettings by remember { mutableStateOf(false) }
@@ -221,8 +220,9 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
     fun uploadSheets(token: String) {
         scope.launch(Dispatchers.IO) {
             try {
-                val result = GoogleSheetsBackupClient().createBackup(token, dao.allTransactions())
-                withContext(Dispatchers.Main) { Toast.makeText(context, "Google Sheets backup created: " + result.spreadsheetUrl, Toast.LENGTH_LONG).show() }
+                val backupData = FinanceBackupData(dao.allTransactions(), dao.allAccounts(), dao.allBudgets(), dao.allReminders(), dao.allMerchantRules())
+                val result = GoogleSheetsBackupClient().createBackup(token, backupData)
+                withContext(Dispatchers.Main) { Toast.makeText(context, "Full Google Sheets backup created: " + result.spreadsheetUrl, Toast.LENGTH_LONG).show() }
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) { Toast.makeText(context, "Google Sheets backup failed: " + e.message, Toast.LENGTH_LONG).show() }
             }
@@ -255,7 +255,7 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
     val backupExporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
         if (uri != null) scope.launch {
             try {
-                val bytes = withContext(Dispatchers.IO) { EncryptedBackup.export(FinanceBackupData(dao.allTransactions(), dao.allAccounts(), dao.allBudgets(), dao.allReminders()), backupPassword.toCharArray()) }
+                val bytes = withContext(Dispatchers.IO) { EncryptedBackup.export(FinanceBackupData(dao.allTransactions(), dao.allAccounts(), dao.allBudgets(), dao.allReminders(), dao.allMerchantRules()), backupPassword.toCharArray()) }
                 withContext(Dispatchers.IO) { context.contentResolver.openOutputStream(uri)?.use { it.write(bytes) } }
                 Toast.makeText(context, "Encrypted backup saved.", Toast.LENGTH_LONG).show()
             } catch (e: Exception) { Toast.makeText(context, "Backup failed: ${e.message}", Toast.LENGTH_LONG).show() }
@@ -331,6 +331,7 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
                 category = category, accountId = accountId, paymentMethod = method, tags = tags,
                 isRecurring = recurring, recurrenceFrequency = frequency)
             dao.insert(transaction)
+            MerchantMemory.rememberCorrection(dao, transaction.title, transaction.category)
             BudgetAlertEvaluator.evaluate(context, transaction)
         }
         showAdd = false
@@ -359,6 +360,7 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
                         updated.accountId, updated.paymentMethod, updated.tags, updated.notes,
                         updated.isRecurring, updated.recurrenceFrequency
                     )
+                    MerchantMemory.rememberCorrection(dao, updated.title, updated.category)
                     BudgetAlertEvaluator.evaluate(context, updated)
                 }
                 editingTransaction = null
@@ -399,7 +401,7 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
                         try {
                             val bytes = withContext(Dispatchers.IO) { context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: byteArrayOf() }
                             val restored = withContext(Dispatchers.Default) { EncryptedBackup.restore(bytes, backupPassword.toCharArray()) }
-                            withContext(Dispatchers.IO) { dao.replaceAllData(restored.transactions, restored.accounts, restored.budgets, restored.reminders) }
+                            withContext(Dispatchers.IO) { dao.replaceAllData(restored.transactions, restored.accounts, restored.budgets, restored.reminders, restored.merchantRules) }
                             FinanceNotifications.scheduleBillChecks(context)
                             FinanceNotifications.scheduleRecurringTransactions(context)
                             Toast.makeText(context, "Restored ${restored.transactions.size} transactions, ${restored.accounts.size} accounts, ${restored.budgets.size} budgets and ${restored.reminders.size} reminders.", Toast.LENGTH_LONG).show()
@@ -455,7 +457,7 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
                     Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), horizontalArrangement = Arrangement.End) {
                         TextButton(onClick = { reportsDialog = false }) { Text("Close reports") }
                     }
-                    AdvancedReports(Modifier.weight(1f).fillMaxWidth(), periodTransactions)
+                    AdvancedReports(Modifier.weight(1f).fillMaxWidth(), periodTransactions, transactions)
                 }
             }
         }

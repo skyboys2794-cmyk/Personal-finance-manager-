@@ -20,6 +20,16 @@ class FinanceAnalyticsTest {
         assertEquals(125_000L, FinanceAnalytics.netWorth(accounts, transactions))
     }
 
+    @Test fun balanceSnapshotsIgnoreTransactionsOnOrBeforeSnapshotDate() {
+        val snapshot = 1_000_000L
+        val account = FinanceAccount(id = 7, name = "Bank", openingBalancePaise = 500_000, balanceAsOfMillis = snapshot)
+        val transactions = listOf(
+            FinanceTransaction(title = "Old salary", amountPaise = 100_000, type = "INCOME", category = "Salary", dateMillis = snapshot - 1, accountId = 7),
+            FinanceTransaction(title = "New expense", amountPaise = 25_000, type = "EXPENSE", category = "Food", dateMillis = snapshot + 1, accountId = 7)
+        )
+        assertEquals(475_000L, FinanceAnalytics.netWorth(listOf(account), transactions))
+    }
+
     @Test fun monthlyReportsExcludeTransfersFromIncomeAndExpenses() {
         val now = java.util.Calendar.getInstance()
         val transactions = listOf(

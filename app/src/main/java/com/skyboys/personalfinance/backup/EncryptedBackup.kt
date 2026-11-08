@@ -4,6 +4,7 @@ import com.skyboys.personalfinance.data.BillReminder
 import com.skyboys.personalfinance.data.FinanceAccount
 import com.skyboys.personalfinance.data.FinanceBudget
 import com.skyboys.personalfinance.data.FinanceTransaction
+import com.skyboys.personalfinance.data.MerchantCategoryRule
 import org.json.JSONArray
 import org.json.JSONObject
 import java.security.SecureRandom
@@ -17,7 +18,8 @@ data class FinanceBackupData(
     val transactions: List<FinanceTransaction>,
     val accounts: List<FinanceAccount>,
     val budgets: List<FinanceBudget>,
-    val reminders: List<BillReminder>
+    val reminders: List<BillReminder>,
+    val merchantRules: List<MerchantCategoryRule> = emptyList()
 )
 
 /** Versioned full-dataset backup encrypted with PBKDF2-HMAC-SHA256 and AES-256-GCM. */
@@ -29,7 +31,7 @@ object EncryptedBackup {
     fun export(data: FinanceBackupData, password: CharArray): ByteArray {
         require(password.size >= 10) { "Use a backup password of at least 10 characters" }
         try {
-            val root = JSONObject().put("format", "personal-finance-backup").put("version", 3)
+            val root = JSONObject().put("format", "personal-finance-backup").put("version", 5)
             root.put("transactions", JSONArray().apply {
                 data.transactions.forEach { t -> put(JSONObject()
                     .put("id", t.id).put("title", t.title).put("amountPaise", t.amountPaise)
@@ -42,7 +44,8 @@ object EncryptedBackup {
                 data.accounts.forEach { a -> put(JSONObject().put("id", a.id).put("name", a.name)
                     .put("institution", a.institution).put("type", a.type).put("openingBalancePaise", a.openingBalancePaise)
                     .put("currency", a.currency).put("isIncludedInNetWorth", a.isIncludedInNetWorth)
-                    .put("creditLimitPaise", a.creditLimitPaise).put("statementDueDay", a.statementDueDay)) }
+                    .put("creditLimitPaise", a.creditLimitPaise).put("statementDueDay", a.statementDueDay)
+                    .put("balanceAsOfMillis", a.balanceAsOfMillis)) }
             })
             root.put("budgets", JSONArray().apply {
                 data.budgets.forEach { b -> put(JSONObject().put("id", b.id).put("category", b.category)
@@ -52,6 +55,14 @@ object EncryptedBackup {
                 data.reminders.forEach { b -> put(JSONObject().put("id", b.id).put("title", b.title)
                     .put("amountPaise", b.amountPaise).put("dueDay", b.dueDay).put("category", b.category)
                     .put("accountId", b.accountId ?: JSONObject.NULL).put("enabled", b.enabled)) }
+            })
+            root.put("merchantRules", JSONArray().apply {
+                data.merchantRules.forEach { rule -> put(JSONObject()
+                    .put("normalizedMerchant", rule.normalizedMerchant)
+                    .put("displayName", rule.displayName)
+                    .put("category", rule.category)
+                    .put("correctionCount", rule.correctionCount)
+                    .put("updatedAtMillis", rule.updatedAtMillis)) }
             })
             return encrypt(root.toString().toByteArray(Charsets.UTF_8), password)
         } finally { password.fill('\u0000') }
@@ -63,7 +74,7 @@ object EncryptedBackup {
         val root = JSONObject(String(plain, Charsets.UTF_8))
         require(root.getString("format") == "personal-finance-backup") { "Unsupported backup format" }
         val version = root.getInt("version")
-        require(version in 1..3) { "Unsupported backup version" }
+        require(version in 1..5) { "Unsupported backup version" }
         val transactions = root.getJSONArray("transactions").objects().map { t ->
             FinanceTransaction(
                 id = if (version >= 2) t.optLong("id", 0) else 0,
@@ -77,12 +88,13 @@ object EncryptedBackup {
                 isRecurring = t.optBoolean("isRecurring", false), recurrenceFrequency = t.optString("recurrenceFrequency", "MONTHLY")
             )
         }
-        if (version == 1) return FinanceBackupData(transactions, emptyList(), emptyList(), emptyList())
+        if (version == 1) return FinanceBackupData(transactions, emptyList(), emptyList(), emptyList(), emptyList())
         val accounts = root.getJSONArray("accounts").objects().map { a -> FinanceAccount(
             id=a.getLong("id"), name=a.getString("name"), institution=a.optString("institution", ""),
             type=a.optString("type", "BANK"), openingBalancePaise=a.optLong("openingBalancePaise", 0),
             currency=a.optString("currency", "INR"), isIncludedInNetWorth=a.optBoolean("isIncludedInNetWorth", true),
-            creditLimitPaise=a.optLong("creditLimitPaise", 0), statementDueDay=a.optInt("statementDueDay", 0)
+            creditLimitPaise=a.optLong("creditLimitPaise", 0), statementDueDay=a.optInt("statementDueDay", 0),
+            balanceAsOfMillis=a.optLong("balanceAsOfMillis", 0)
         ) }
         val budgets = root.getJSONArray("budgets").objects().map { b -> FinanceBudget(
             id=b.getLong("id"), category=b.getString("category"), limitPaise=b.getLong("limitPaise"),
@@ -94,7 +106,16 @@ object EncryptedBackup {
             accountId=if (b.isNull("accountId")) null else b.getLong("accountId"),
             enabled=b.optBoolean("enabled", true)
         ) }
-        return FinanceBackupData(transactions, accounts, budgets, reminders)
+        val merchantRules = if (version >= 5 && root.has("merchantRules")) root.getJSONArray("merchantRules").objects().map { rule ->
+            MerchantCategoryRule(
+                normalizedMerchant = rule.getString("normalizedMerchant"),
+                displayName = rule.getString("displayName"),
+                category = rule.getString("category"),
+                correctionCount = rule.optInt("correctionCount", 1),
+                updatedAtMillis = rule.optLong("updatedAtMillis", 0)
+            )
+        } else emptyList()
+        return FinanceBackupData(transactions, accounts, budgets, reminders, merchantRules)
     }
 
     private fun JSONArray.objects(): List<JSONObject> = (0 until length()).map { getJSONObject(it) }

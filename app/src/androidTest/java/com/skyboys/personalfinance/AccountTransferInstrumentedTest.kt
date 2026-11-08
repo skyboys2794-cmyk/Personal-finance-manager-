@@ -19,15 +19,15 @@ class AccountTransferInstrumentedTest {
     @Test fun accountCanBeEditedDeletedAndTransfersRemainPaired() = runBlocking {
         val dao = FinanceDatabase.get(InstrumentationRegistry.getInstrumentation().targetContext).financeDao()
         val suffix = UUID.randomUUID().toString().take(8)
-        val fromId = dao.insertAccount(FinanceAccount(name="Test source $suffix", creditLimitPaise=0, statementDueDay=0))
-        val toId = dao.insertAccount(FinanceAccount(name="Test destination $suffix", creditLimitPaise=0, statementDueDay=0))
+        val fromId = dao.insertAccount(FinanceAccount(name="Test source $suffix", creditLimitPaise=0, statementDueDay=0, balanceAsOfMillis=0))
+        val toId = dao.insertAccount(FinanceAccount(name="Test destination $suffix", creditLimitPaise=0, statementDueDay=0, balanceAsOfMillis=0))
         val transferId = UUID.randomUUID().toString()
         dao.insertTransferPair(
             FinanceTransaction(title="Transfer out", amountPaise=1500, type="TRANSFER_OUT", category="Transfers", accountId=fromId, transferId=transferId),
             FinanceTransaction(title="Transfer in", amountPaise=1500, type="TRANSFER_IN", category="Transfers", accountId=toId, transferId=transferId)
         )
         dao.saveReminder(BillReminder(title="Test bill $suffix", amountPaise=1000, dueDay=10, accountId=fromId))
-        dao.updateAccount(fromId, "Edited source $suffix", "Test bank", "BANK", 5000, "INR", true, 0L, 0)
+        dao.updateAccount(fromId, "Edited source $suffix", "Test bank", "BANK", 5000, "INR", true, 0L, 0, 0L)
         assertEquals("Edited source $suffix", dao.allAccounts().first { it.id == fromId }.name)
         assertEquals(2, dao.allTransactions().count { it.transferId == transferId })
 

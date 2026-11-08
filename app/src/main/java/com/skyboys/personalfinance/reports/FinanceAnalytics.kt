@@ -61,7 +61,7 @@ object FinanceAnalytics {
 
     fun netWorth(accounts: List<FinanceAccount>, transactions: List<FinanceTransaction>): Long {
         return accounts.filter { it.isIncludedInNetWorth }.sumOf { account ->
-            account.openingBalancePaise + transactions.filter { it.accountId == account.id }
+            account.openingBalancePaise + transactions.filter { it.accountId == account.id && it.dateMillis > account.balanceAsOfMillis }
                 .sumOf { when (it.type) {
                     "INCOME", "TRANSFER_IN" -> it.amountPaise
                     "EXPENSE", "TRANSFER_OUT" -> -it.amountPaise
