@@ -15,7 +15,7 @@ class FinanceNavigationSmokeTest {
     val composeRule = createAndroidComposeRule<MainActivity>()
 
     @Test fun mainTabsRenderAndNavigate() {
-        composeRule.onNodeWithText("Your finances").assertIsDisplayed()
+        composeRule.onNodeWithText("Finance Assistant").assertIsDisplayed()
         composeRule.onNodeWithText("Activity").performClick()
         composeRule.onNodeWithText("All transactions").assertIsDisplayed()
         composeRule.onNodeWithText("Accounts").performClick()
