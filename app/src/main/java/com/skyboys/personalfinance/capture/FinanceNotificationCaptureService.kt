@@ -38,9 +38,11 @@ class FinanceNotificationCaptureService : NotificationListenerService() {
             runCatching {
                 val dao = FinanceDatabase.get(applicationContext).financeDao()
                 val accounts = dao.allAccounts()
-                val preferredId = prefs.getLong(KEY_ACCOUNT_ID, -1L).takeIf { it > 0L }
+                val isCardSource = CARD_SOURCE_PACKAGES.contains(sbn.packageName)
+                val preferredId = prefs.getLong(if (isCardSource) KEY_CARD_ACCOUNT_ID else KEY_ACCOUNT_ID, -1L).takeIf { it > 0L }
+                val preferredType = if (isCardSource) "CREDIT_CARD" else "BANK"
                 val accountId = accounts.firstOrNull { it.id == preferredId }?.id
-                    ?: accounts.firstOrNull { it.type == "BANK" }?.id
+                    ?: accounts.firstOrNull { it.type == preferredType }?.id
                     ?: accounts.firstOrNull { it.type == "WALLET" }?.id
                 val transactionTime = sbn.postTime.takeIf { it > 0L } ?: System.currentTimeMillis()
                 val duplicate = dao.allTransactions().any { item ->
@@ -74,17 +76,37 @@ class FinanceNotificationCaptureService : NotificationListenerService() {
         const val PREFS = "automatic_capture"
         const val KEY_ENABLED = "capture_enabled"
         const val KEY_ACCOUNT_ID = "default_account_id"
+        const val KEY_CARD_ACCOUNT_ID = "default_card_account_id"
         const val TAG_CAPTURE = "AUTO_CAPTURE"
         const val KEY_PHONEPE = "source_phonepe"
         const val KEY_GPAY = "source_gpay"
         const val KEY_PAYTM = "source_paytm"
         const val KEY_AMAZON = "source_amazon"
+        const val KEY_SBI = "source_sbi"
+        const val KEY_HDFC = "source_hdfc"
+        const val KEY_ICICI = "source_icici"
+        const val KEY_AXIS = "source_axis"
+        const val KEY_KOTAK = "source_kotak"
+        const val KEY_IDFC = "source_idfc"
+        const val KEY_CRED = "source_cred"
+        const val KEY_ONECARD = "source_onecard"
 
+        val CARD_SOURCE_PACKAGES = setOf(
+            "com.sbicard", "com.fpl.onecard", "com.dreamplug.androidapp"
+        )
         val SOURCE_KEYS = mapOf(
             "com.phonepe.app" to KEY_PHONEPE,
             "com.google.android.apps.nbu.paisa.user" to KEY_GPAY,
             "net.one97.paytm" to KEY_PAYTM,
-            "in.amazon.mShop.android.shopping" to KEY_AMAZON
+            "in.amazon.mShop.android.shopping" to KEY_AMAZON,
+            "com.sbicard" to KEY_SBI,
+            "com.snapwork.hdfc" to KEY_HDFC,
+            "com.csam.icici.bank.imobile" to KEY_ICICI,
+            "com.axis.mobile" to KEY_AXIS,
+            "com.kotak.bank.mobile" to KEY_KOTAK,
+            "com.idfcfirstbank.optimus" to KEY_IDFC,
+            "com.dreamplug.androidapp" to KEY_CRED,
+            "com.fpl.onecard" to KEY_ONECARD
         )
 
         fun isListenerEnabled(context: android.content.Context): Boolean {
