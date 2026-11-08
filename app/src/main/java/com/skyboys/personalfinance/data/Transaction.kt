@@ -16,5 +16,7 @@ data class FinanceTransaction(
     val paymentMethod: String = "CASH",
     val tags: String = "",
     val notes: String = "",
-    val transferId: String? = null
+    val transferId: String? = null,
+    val isRecurring: Boolean = false,
+    val recurrenceFrequency: String = "MONTHLY"
 )
