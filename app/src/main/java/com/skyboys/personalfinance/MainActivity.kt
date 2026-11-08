@@ -95,6 +95,9 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
     var backupDialog by remember { mutableStateOf(false) }
     var backupMode by remember { mutableStateOf("export") }
     var backupPassword by remember { mutableStateOf("") }
+    var customizeDashboard by remember { mutableStateOf(false) }
+    var showSpending by remember { mutableStateOf(context.getSharedPreferences("dashboard_prefs", 0).getBoolean("show_spending", true)) }
+    var showRecent by remember { mutableStateOf(context.getSharedPreferences("dashboard_prefs", 0).getBoolean("show_recent", true)) }
     val summary = remember(transactions) { FinanceAnalytics.summarize(transactions) }
 
     val csvPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -144,6 +147,7 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
                 actions = {
                     TextButton(onClick = { csvPicker.launch(arrayOf("text/*", "application/vnd.ms-excel")) }) { Text("Import CSV") }
                     TextButton(onClick = { backupMode = "export"; backupDialog = true }) { Text("Backup") }
+                    TextButton(onClick = { customizeDashboard = true }) { Text("Customize") }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFF6F8F6))
             )
@@ -163,7 +167,7 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
         }
     ) { padding ->
         when (tab) {
-            0 -> Dashboard(Modifier.padding(padding), transactions, summary.incomePaise, summary.expensePaise, summary.netCashFlowPaise, summary.expenseByCategory)
+            0 -> Dashboard(Modifier.padding(padding), transactions, summary.incomePaise, summary.expensePaise, summary.netCashFlowPaise, summary.expenseByCategory, showSpending, showRecent)
             1 -> ActivityList(Modifier.padding(padding), transactions) { id -> scope.launch(Dispatchers.IO) { dao.delete(id) } }
             2 -> AccountsList(Modifier.padding(padding), accounts, dao) { name, institution, type, balance ->
                 scope.launch(Dispatchers.IO) { dao.insertAccount(FinanceAccount(name = name, institution = institution, type = type, openingBalancePaise = (balance * 100).toLong())) }
@@ -180,6 +184,26 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
             BudgetAlertEvaluator.evaluate(context, transaction)
         }
         showAdd = false
+    }
+
+    if (customizeDashboard) {
+        AlertDialog(
+            onDismissRequest = { customizeDashboard = false },
+            title = { Text("Customize dashboard") },
+            text = {
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = showSpending, onCheckedChange = { showSpending = it; context.getSharedPreferences("dashboard_prefs", 0).edit().putBoolean("show_spending", it).apply() })
+                        Text("Show spending breakdown")
+                    }
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = showRecent, onCheckedChange = { showRecent = it; context.getSharedPreferences("dashboard_prefs", 0).edit().putBoolean("show_recent", it).apply() })
+                        Text("Show recent activity")
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { customizeDashboard = false }) { Text("Done") } }
+        )
     }
 
     if (backupDialog) {
@@ -215,7 +239,7 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
 }
 
 @Composable
-private fun Dashboard(modifier: Modifier, transactions: List<FinanceTransaction>, income: Long, expenses: Long, netFlow: Long, categories: Map<String, Long>) {
+private fun Dashboard(modifier: Modifier, transactions: List<FinanceTransaction>, income: Long, expenses: Long, netFlow: Long, categories: Map<String, Long>, showSpending: Boolean, showRecent: Boolean) {
     LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 96.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item {
             Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(26.dp), colors = CardDefaults.cardColors(containerColor = Forest)) {
@@ -231,14 +255,14 @@ private fun Dashboard(modifier: Modifier, transactions: List<FinanceTransaction>
                 }
             }
         }
-        item {
+        if (showSpending) item {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Spending breakdown", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                 Text(SimpleDateFormat("MMMM", Locale.getDefault()).format(Date()), color = Muted, style = MaterialTheme.typography.labelMedium)
             }
         }
-        if (categories.isEmpty()) item { EmptyCard("Your spending chart will appear here", "Add expenses to see where your money goes.") }
-        else {
+        if (showSpending && categories.isEmpty()) item { EmptyCard("Your spending chart will appear here", "Add expenses to see where your money goes.") }
+        else if (showSpending) {
             item { SpendingChart(categories) }
             items(categories.entries.toList()) { (category, amount) ->
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -248,9 +272,9 @@ private fun Dashboard(modifier: Modifier, transactions: List<FinanceTransaction>
                 }
             }
         }
-        item { Text("Recent activity", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
-        items(transactions.take(4), key = { it.id }) { TransactionRow(it) }
-        if (transactions.isEmpty()) item { EmptyCard("No transactions yet", "Tap + to add your first income or expense.") }
+        if (showRecent) item { Text("Recent activity", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
+        if (showRecent) items(transactions.take(4), key = { it.id }) { TransactionRow(it) }
+        if (showRecent && transactions.isEmpty()) item { EmptyCard("No transactions yet", "Tap + to add your first income or expense.") }
     }
 }
 
