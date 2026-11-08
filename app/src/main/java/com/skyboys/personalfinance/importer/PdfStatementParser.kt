@@ -30,7 +30,7 @@ data class PdfStatementParseResult(
 object PdfStatementParser {
     private val dateRegex = Regex("""\\b(?:\\d{2}[/-]\\d{2}[/-]\\d{4}|\\d{4}-\\d{2}-\\d{2}|\\d{2}[- ]?[A-Za-z]{3}[- ]?\\d{4})\\b""")
     private val amountRegex = Regex("""(?<![A-Za-z0-9])(?:INR\\s*|₹\\s*)?(-?\\d[\\d,]*\\.\\d{1,2})(?![A-Za-z0-9])""")
-    private val dateFormats = listOf("dd/MM/yyyy", "dd-MM-yyyy", "yyyy-MM-dd", "dd MMM yyyy", "dd-MMM-yyyy", "dd-MMM-yyyy")
+    private val dateFormats = listOf("dd/MM/yyyy", "dd-MM-yyyy", "yyyy-MM-dd", "dd MMM yyyy", "dd-MMM-yyyy")
 
     fun read(context: Context, uri: Uri, password: String = ""): PdfStatementParseResult {
         PDFBoxResourceLoader.init(context.applicationContext)
