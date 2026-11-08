@@ -21,6 +21,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -32,6 +33,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.ExperimentalMaterial3Api
 import com.skyboys.personalfinance.data.FinanceDao
 import com.skyboys.personalfinance.importer.PdfPasswordRequiredException
 import com.skyboys.personalfinance.importer.PdfStatementEntry
@@ -49,7 +51,7 @@ fun PdfStatementImportDialog(dao: FinanceDao, onDismiss: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val accounts by dao.observeAccounts().collectAsState(initial = emptyList())
-    var selectedAccountId by remember { mutableStateOf<Long?>(null) }
+    var selectedAccountId by remember { mutableStateOf<Long?>(null) }\n    LaunchedEffect(accounts) { if (selectedAccountId == null) selectedAccountId = accounts.firstOrNull { it.type == "BANK" }?.id }
     var accountMenu by remember { mutableStateOf(false) }
     var selectedUri by remember { mutableStateOf<android.net.Uri?>(null) }
     var password by remember { mutableStateOf("") }
@@ -147,7 +149,7 @@ fun PdfStatementImportDialog(dao: FinanceDao, onDismiss: () -> Unit) {
                             modifier = Modifier.menuAnchor().fillMaxWidth()
                         )
                         ExposedDropdownMenu(expanded = accountMenu, onDismissRequest = { accountMenu = false }) {
-                            accounts.filter { it.type == "BANK" }.forEach { account ->
+                            accounts.filter { it.type != "CREDIT_CARD" }.forEach { account ->
                                 DropdownMenuItem(text = { Text(account.name) }, onClick = { selectedAccountId = account.id; accountMenu = false })
                             }
                         }
