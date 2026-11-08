@@ -20,6 +20,8 @@ interface FinanceDao {
     suspend fun delete(id: Long)
     @Query("SELECT * FROM accounts ORDER BY name")
     fun observeAccounts(): Flow<List<FinanceAccount>>
+    @Query("SELECT * FROM accounts ORDER BY name")
+    suspend fun allAccounts(): List<FinanceAccount>
     @Insert
     suspend fun insertAccount(account: FinanceAccount): Long
     @Query("SELECT * FROM budgets ORDER BY category")
