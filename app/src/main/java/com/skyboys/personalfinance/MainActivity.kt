@@ -111,8 +111,14 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
             try {
                 val csv = withContext(Dispatchers.IO) { context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() } ?: "" }
                 val parsed = withContext(Dispatchers.Default) { CsvTransactionParser.parse(csv) }
-                if (parsed.transactions.isNotEmpty()) withContext(Dispatchers.IO) { dao.insertAll(parsed.transactions) }
-                Toast.makeText(context, "Imported ${parsed.transactions.size} transactions. ${parsed.errors.size} rows skipped.", Toast.LENGTH_LONG).show()
+                val importedCount = withContext(Dispatchers.IO) {
+                    val existing = dao.allTransactions().map { "${it.dateMillis}|${it.title.lowercase(Locale.ROOT)}|${it.amountPaise}|${it.type}" }.toMutableSet()
+                    val unique = parsed.transactions.filter { existing.add("${it.dateMillis}|${it.title.lowercase(Locale.ROOT)}|${it.amountPaise}|${it.type}") }
+                    if (unique.isNotEmpty()) dao.insertAll(unique)
+                    unique.size
+                }
+                val skipped = parsed.errors.size + parsed.transactions.size - importedCount
+                Toast.makeText(context, "Imported $importedCount transactions. $skipped rows skipped or already present.", Toast.LENGTH_LONG).show()
             } catch (e: Exception) {
                 Toast.makeText(context, "CSV import failed: ${e.message}", Toast.LENGTH_LONG).show()
             }
