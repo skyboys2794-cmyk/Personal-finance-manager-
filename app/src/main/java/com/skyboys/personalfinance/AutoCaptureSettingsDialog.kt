@@ -6,6 +6,9 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -37,8 +40,18 @@ fun AutoCaptureSettingsDialog(dao: FinanceDao, onDismiss: () -> Unit) {
     var gpay by remember { mutableStateOf(prefs.getBoolean(FinanceNotificationCaptureService.KEY_GPAY, true)) }
     var paytm by remember { mutableStateOf(prefs.getBoolean(FinanceNotificationCaptureService.KEY_PAYTM, true)) }
     var amazon by remember { mutableStateOf(prefs.getBoolean(FinanceNotificationCaptureService.KEY_AMAZON, false)) }
+    var sbi by remember { mutableStateOf(prefs.getBoolean(FinanceNotificationCaptureService.KEY_SBI, true)) }
+    var hdfc by remember { mutableStateOf(prefs.getBoolean(FinanceNotificationCaptureService.KEY_HDFC, true)) }
+    var icici by remember { mutableStateOf(prefs.getBoolean(FinanceNotificationCaptureService.KEY_ICICI, true)) }
+    var axis by remember { mutableStateOf(prefs.getBoolean(FinanceNotificationCaptureService.KEY_AXIS, true)) }
+    var kotak by remember { mutableStateOf(prefs.getBoolean(FinanceNotificationCaptureService.KEY_KOTAK, true)) }
+    var idfc by remember { mutableStateOf(prefs.getBoolean(FinanceNotificationCaptureService.KEY_IDFC, true)) }
+    var cred by remember { mutableStateOf(prefs.getBoolean(FinanceNotificationCaptureService.KEY_CRED, true)) }
+    var oneCard by remember { mutableStateOf(prefs.getBoolean(FinanceNotificationCaptureService.KEY_ONECARD, true)) }
     var accountId by remember { mutableStateOf(prefs.getLong(FinanceNotificationCaptureService.KEY_ACCOUNT_ID, -1L)) }
+    var cardAccountId by remember { mutableStateOf(prefs.getLong(FinanceNotificationCaptureService.KEY_CARD_ACCOUNT_ID, -1L)) }
     var showAccounts by remember { mutableStateOf(false) }
+    var showCardAccounts by remember { mutableStateOf(false) }
     val listenerEnabled = FinanceNotificationCaptureService.isListenerEnabled(context)
 
     fun persist() {
@@ -48,7 +61,16 @@ fun AutoCaptureSettingsDialog(dao: FinanceDao, onDismiss: () -> Unit) {
             .putBoolean(FinanceNotificationCaptureService.KEY_GPAY, gpay)
             .putBoolean(FinanceNotificationCaptureService.KEY_PAYTM, paytm)
             .putBoolean(FinanceNotificationCaptureService.KEY_AMAZON, amazon)
+            .putBoolean(FinanceNotificationCaptureService.KEY_SBI, sbi)
+            .putBoolean(FinanceNotificationCaptureService.KEY_HDFC, hdfc)
+            .putBoolean(FinanceNotificationCaptureService.KEY_ICICI, icici)
+            .putBoolean(FinanceNotificationCaptureService.KEY_AXIS, axis)
+            .putBoolean(FinanceNotificationCaptureService.KEY_KOTAK, kotak)
+            .putBoolean(FinanceNotificationCaptureService.KEY_IDFC, idfc)
+            .putBoolean(FinanceNotificationCaptureService.KEY_CRED, cred)
+            .putBoolean(FinanceNotificationCaptureService.KEY_ONECARD, oneCard)
             .putLong(FinanceNotificationCaptureService.KEY_ACCOUNT_ID, accountId)
+            .putLong(FinanceNotificationCaptureService.KEY_CARD_ACCOUNT_ID, cardAccountId)
             .apply()
     }
 
@@ -56,7 +78,7 @@ fun AutoCaptureSettingsDialog(dao: FinanceDao, onDismiss: () -> Unit) {
         onDismissRequest = { persist(); onDismiss() },
         title = { Text("Automatic transaction capture") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(Modifier.heightIn(max = 460.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 Text(
                     if (listenerEnabled) "Android notification access is granted." else "Grant Android notification access to read selected payment notifications.",
                     style = MaterialTheme.typography.bodySmall,
@@ -74,11 +96,24 @@ fun AutoCaptureSettingsDialog(dao: FinanceDao, onDismiss: () -> Unit) {
                 SourceToggle("Google Pay", gpay) { gpay = it; persist() }
                 SourceToggle("Paytm", paytm) { paytm = it; persist() }
                 SourceToggle("Amazon", amazon) { amazon = it; persist() }
-                Text("Save captured transactions to", style = MaterialTheme.typography.titleSmall)
+                Text("Bank and card issuer apps", style = MaterialTheme.typography.titleSmall)
+                SourceToggle("SBI Card", sbi) { sbi = it; persist() }
+                SourceToggle("HDFC Bank", hdfc) { hdfc = it; persist() }
+                SourceToggle("ICICI iMobile", icici) { icici = it; persist() }
+                SourceToggle("Axis Mobile", axis) { axis = it; persist() }
+                SourceToggle("Kotak", kotak) { kotak = it; persist() }
+                SourceToggle("IDFC FIRST Bank", idfc) { idfc = it; persist() }
+                SourceToggle("CRED", cred) { cred = it; persist() }
+                SourceToggle("OneCard", oneCard) { oneCard = it; persist() }
+                Text("UPI and bank transactions save to", style = MaterialTheme.typography.titleSmall)
                 OutlinedButton(onClick = { showAccounts = true }, modifier = Modifier.fillMaxWidth()) {
                     Text(accounts.firstOrNull { it.id == accountId }?.name ?: "Automatically choose a bank account")
                 }
-                Text("Clear amount and debit/credit alerts are saved locally. Unknown merchants use Other for review. Unclear notifications are skipped.", style = MaterialTheme.typography.bodySmall)
+                Text("Clear amount and debit/credit alerts are saved locally. Card issuer notifications use the selected card account. Unknown merchants use Other for review. Unclear notifications are skipped.", style = MaterialTheme.typography.bodySmall)
+                Text("Credit card transactions save to", style = MaterialTheme.typography.titleSmall)
+                OutlinedButton(onClick = { showCardAccounts = true }, modifier = Modifier.fillMaxWidth()) {
+                    Text(accounts.firstOrNull { it.id == cardAccountId }?.name ?: "Automatically choose a credit card")
+                }
                 if (!listenerEnabled) Button(onClick = { context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)) }, modifier = Modifier.fillMaxWidth()) {
                     Text("Grant notification access")
                 }
@@ -101,6 +136,21 @@ fun AutoCaptureSettingsDialog(dao: FinanceDao, onDismiss: () -> Unit) {
                 }
             },
             confirmButton = { TextButton(onClick = { showAccounts = false }) { Text("Close") } }
+        )
+    }
+    if (showCardAccounts) {
+        AlertDialog(
+            onDismissRequest = { showCardAccounts = false },
+            title = { Text("Choose credit card account") },
+            text = {
+                Column {
+                    TextButton(onClick = { cardAccountId = -1L; persist(); showCardAccounts = false }) { Text("Automatically choose a credit card") }
+                    accounts.filter { it.type == "CREDIT_CARD" }.forEach { account ->
+                        TextButton(onClick = { cardAccountId = account.id; persist(); showCardAccounts = false }) { Text(account.name) }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { showCardAccounts = false }) { Text("Close") } }
         )
     }
 }
