@@ -88,9 +88,13 @@ interface FinanceDao {
     @Query("SELECT * FROM merchant_category_rules ORDER BY updatedAtMillis DESC")
     fun observeMerchantRules(): Flow<List<MerchantCategoryRule>>
 
+    @Query("SELECT * FROM merchant_category_rules ORDER BY normalizedMerchant")
+    suspend fun allMerchantRules(): List<MerchantCategoryRule>
+
     @Transaction
-    suspend fun replaceAllData(transactions: List<FinanceTransaction>, accounts: List<FinanceAccount>, budgets: List<FinanceBudget>, reminders: List<BillReminder>) {
+    suspend fun replaceAllData(transactions: List<FinanceTransaction>, accounts: List<FinanceAccount>, budgets: List<FinanceBudget>, reminders: List<BillReminder>, merchantRules: List<MerchantCategoryRule>) {
         clearTransactions()
+        clearMerchantCategoryRules()
         clearAccounts()
         clearBudgets()
         clearReminders()
@@ -98,14 +102,17 @@ interface FinanceDao {
         if (transactions.isNotEmpty()) insertTransactionsForRestore(transactions)
         if (budgets.isNotEmpty()) insertBudgetsForRestore(budgets)
         if (reminders.isNotEmpty()) insertRemindersForRestore(reminders)
+        if (merchantRules.isNotEmpty()) insertMerchantRulesForRestore(merchantRules)
     }
 
     @Query("DELETE FROM transactions") suspend fun clearTransactions()
     @Query("DELETE FROM accounts") suspend fun clearAccounts()
     @Query("DELETE FROM budgets") suspend fun clearBudgets()
     @Query("DELETE FROM bill_reminders") suspend fun clearReminders()
+    @Query("DELETE FROM merchant_category_rules") suspend fun clearMerchantCategoryRules()
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insertAccountsForRestore(items: List<FinanceAccount>)
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insertTransactionsForRestore(items: List<FinanceTransaction>)
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insertBudgetsForRestore(items: List<FinanceBudget>)
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insertRemindersForRestore(items: List<BillReminder>)
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insertMerchantRulesForRestore(items: List<MerchantCategoryRule>)
 }
