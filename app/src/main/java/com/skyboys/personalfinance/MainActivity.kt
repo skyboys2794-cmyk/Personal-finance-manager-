@@ -143,9 +143,22 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
     val summary = remember(transactions, periodBounds) {
         FinanceAnalytics.summarizeRange(transactions, periodBounds.first, periodBounds.second, periodBounds.third)
     }
-    val periodDuration = (periodBounds.second - periodBounds.first).coerceAtLeast(1L)
-    val previousPeriodExpense = remember(transactions, periodBounds) {
-        FinanceAnalytics.summarizeRange(transactions, periodBounds.first - periodDuration, periodBounds.first, "Previous period").expensePaise
+    val previousPeriodBounds = remember(dashboardPeriod, periodBounds) {
+        when (dashboardPeriod) {
+            "THIS_MONTH", "LAST_MONTH" -> {
+                val previousStart = (Calendar.getInstance().apply { timeInMillis = periodBounds.first }).apply {
+                    add(Calendar.MONTH, -1)
+                }
+                previousStart.timeInMillis to periodBounds.first
+            }
+            else -> {
+                val duration = (periodBounds.second - periodBounds.first).coerceAtLeast(1L)
+                (periodBounds.first - duration) to periodBounds.first
+            }
+        }
+    }
+    val previousPeriodExpense = remember(transactions, previousPeriodBounds) {
+        FinanceAnalytics.summarizeRange(transactions, previousPeriodBounds.first, previousPeriodBounds.second, "Previous period").expensePaise
     }
     val periodTransactions = remember(transactions, periodBounds) {
         transactions.filter { it.dateMillis >= periodBounds.first && it.dateMillis < periodBounds.second }
