@@ -204,6 +204,7 @@ private fun AccountActions(onEdit: () -> Unit, onDelete: () -> Unit) {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AccountEditorDialog(account: FinanceAccount?, onDismiss: () -> Unit, onSave: (String, String, String, Long, Boolean, Long, Int, Long) -> Unit) {
+    val context = LocalContext.current
     var name by remember(account?.id) { mutableStateOf(account?.name.orEmpty()) }
     var institution by remember(account?.id) { mutableStateOf(account?.institution.orEmpty()) }
     var type by remember(account?.id) { mutableStateOf(account?.type ?: "BANK") }
