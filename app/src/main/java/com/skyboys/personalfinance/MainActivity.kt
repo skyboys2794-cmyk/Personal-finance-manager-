@@ -409,7 +409,8 @@ private fun AccountsList(
                         Text(account.name, fontWeight = FontWeight.SemiBold)
                         Text("${account.institution.ifBlank { account.type }} · ${account.currency}", color = Muted, style = MaterialTheme.typography.bodySmall)
                     }
-                    Text(money(account.openingBalancePaise), fontWeight = FontWeight.Bold)
+                    val currentBalance = account.openingBalancePaise + transactions.filter { it.accountId == account.id }.sumOf { if (it.type == "INCOME") it.amountPaise else -it.amountPaise }
+                    Text(money(currentBalance), fontWeight = FontWeight.Bold)
                 }
             }
         }
