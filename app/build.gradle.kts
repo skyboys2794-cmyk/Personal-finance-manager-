@@ -44,6 +44,8 @@ dependencies {
     implementation("androidx.room:room-runtime:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1")
     implementation("androidx.work:work-runtime-ktx:2.10.0")
+    // Apache PDFBox Android: free, on-device PDF text extraction (including encrypted PDFs).
+    implementation("com.tom-roush:pdfbox-android:2.0.27.0")
     ksp("androidx.room:room-compiler:2.6.1")
     debugImplementation("androidx.compose.ui:ui-tooling")
     debugImplementation("androidx.compose.ui:ui-test-manifest")
