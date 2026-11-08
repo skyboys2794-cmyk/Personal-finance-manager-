@@ -322,10 +322,23 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
             initial = current,
             onSave = { title, amount, type, category, accountId, method, tags, recurring, frequency ->
                 scope.launch(Dispatchers.IO) {
-                    dao.updateTransaction(
-                        current.id, title, (amount * 100).toLong(), type, category, accountId,
-                        method, tags, current.notes, recurring, frequency
+                    val updated = current.copy(
+                        title = title,
+                        amountPaise = (amount * 100).toLong(),
+                        type = type,
+                        category = category,
+                        accountId = accountId,
+                        paymentMethod = method,
+                        tags = tags,
+                        isRecurring = recurring,
+                        recurrenceFrequency = frequency
                     )
+                    dao.updateTransaction(
+                        current.id, updated.title, updated.amountPaise, updated.type, updated.category,
+                        updated.accountId, updated.paymentMethod, updated.tags, updated.notes,
+                        updated.isRecurring, updated.recurrenceFrequency
+                    )
+                    BudgetAlertEvaluator.evaluate(context, updated)
                 }
                 editingTransaction = null
             }
