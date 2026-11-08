@@ -1,0 +1,14 @@
+package com.skyboys.personalfinance.data
+
+import androidx.room.Entity
+import androidx.room.PrimaryKey
+
+@Entity(tableName = "transactions")
+data class FinanceTransaction(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val title: String,
+    val amountPaise: Long,
+    val type: String,
+    val category: String,
+    val dateMillis: Long = System.currentTimeMillis()
+)
