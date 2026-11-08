@@ -201,7 +201,7 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
                         Text("Finance Assistant", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Canvas)
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = AppBackground)
             )
         },
         bottomBar = {
