@@ -37,3 +37,13 @@ data class BillReminder(
     val accountId: Long? = null,
     val enabled: Boolean = true
 )
+
+
+@Entity(tableName = "merchant_category_rules")
+data class MerchantCategoryRule(
+    @PrimaryKey val normalizedMerchant: String,
+    val displayName: String,
+    val category: String,
+    val correctionCount: Int = 1,
+    val updatedAtMillis: Long = System.currentTimeMillis()
+)
