@@ -79,6 +79,7 @@ class MainActivity : ComponentActivity() {
         val dao = FinanceDatabase.get(this).financeDao()
         FinanceNotifications.ensureChannel(this)
         FinanceNotifications.scheduleBillChecks(this)
+        FinanceNotifications.scheduleRecurringTransactions(this)
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 701)
         }
