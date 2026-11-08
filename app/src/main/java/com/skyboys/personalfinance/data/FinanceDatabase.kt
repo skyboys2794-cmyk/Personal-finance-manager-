@@ -28,7 +28,16 @@ private val MIGRATION_2_3 = object : Migration(2, 3) {
     }
 }
 
-@Database(entities = [FinanceTransaction::class, FinanceAccount::class, FinanceBudget::class, BillReminder::class], version = 3, exportSchema = false)
+private val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE accounts ADD COLUMN creditLimitPaise INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE accounts ADD COLUMN statementDueDay INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE transactions ADD COLUMN isRecurring INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE transactions ADD COLUMN recurrenceFrequency TEXT NOT NULL DEFAULT 'MONTHLY'")
+    }
+}
+
+@Database(entities = [FinanceTransaction::class, FinanceAccount::class, FinanceBudget::class, BillReminder::class], version = 4, exportSchema = false)
 abstract class FinanceDatabase : RoomDatabase() {
     abstract fun financeDao(): FinanceDao
     companion object {
@@ -36,7 +45,7 @@ abstract class FinanceDatabase : RoomDatabase() {
         fun get(context: Context): FinanceDatabase =
             INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(context.applicationContext, FinanceDatabase::class.java, "personal-finance.db")
-                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3).build().also { INSTANCE = it }
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4).build().also { INSTANCE = it }
             }
     }
 }
