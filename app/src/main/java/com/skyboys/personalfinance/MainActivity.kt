@@ -433,7 +433,9 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
             },
             dismissButton = {
                 Row {
-                    TextButton(onClick = { backupMode = "restore" }) { Text("Restore instead") }
+                    TextButton(onClick = { backupMode = if (backupMode == "export") "restore" else "export" }) {
+                        Text(if (backupMode == "export") "Restore instead" else "Create backup instead")
+                    }
                     TextButton(onClick = { backupDialog = false; backupPassword = "" }) { Text("Cancel") }
                 }
             }
