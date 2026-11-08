@@ -12,6 +12,7 @@ object MerchantMemory {
     fun normalizeMerchant(value: String): String = value
         .lowercase(Locale.ROOT)
         .replace(Regex("""\\b(?:upi|txn|transaction|ref|reference|order|id|no)\\s*[:#/-]?\\s*[a-z0-9-]{4,}\\b"""), " ")
+        .replace(Regex("""\\b(?:upi|payment|paid|sent|received|transfer|transaction|purchase|debit|credit|to|from)\\b"""), " ")
         .replace(Regex("""\\b\\d+\\b"""), " ")
         .replace(Regex("""[^a-z\\s]"""), " ")
         .replace(Regex("""\\s+"""), " ")
