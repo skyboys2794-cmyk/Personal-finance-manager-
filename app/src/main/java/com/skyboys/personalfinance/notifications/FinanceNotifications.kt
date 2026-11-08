@@ -55,14 +55,17 @@ class BillReminderWorker(context: Context, params: WorkerParameters) : Coroutine
         val today = Calendar.getInstance()
         val day = today.get(Calendar.DAY_OF_MONTH)
         val monthDays = today.getActualMaximum(Calendar.DAY_OF_MONTH)
-        reminders.forEach { bill ->
+        val preferences = applicationContext.getSharedPreferences("finance_alert_state", Context.MODE_PRIVATE)
+        reminders.filter { it.enabled && it.dueDay in 1..31 }.forEach { bill ->
             val daysUntilDue = (bill.dueDay - day + monthDays) % monthDays
-            if (daysUntilDue in 0..3) {
+            val alertKey = "bill-reminder-${bill.id}-${today.get(Calendar.YEAR)}-${today.get(Calendar.DAY_OF_YEAR)}"
+            if (daysUntilDue in 0..3 && !preferences.getBoolean(alertKey, false)) {
                 FinanceNotifications.notify(
                     applicationContext, 20_000 + bill.id.toInt(),
                     if (daysUntilDue == 0) "Bill due today" else "Bill due in $daysUntilDue day(s)",
                     "${bill.title} · ₹${"%.2f".format(Locale.US, bill.amountPaise / 100.0)}"
                 )
+                preferences.edit().putBoolean(alertKey, true).apply()
             }
         }
         Result.success()
@@ -73,17 +76,18 @@ object BudgetAlertEvaluator {
     suspend fun evaluate(context: Context, transaction: FinanceTransaction) {
         if (transaction.type != "EXPENSE") return
         val dao = FinanceDatabase.get(context).financeDao()
-        val budgets = dao.allBudgets().filter { it.category == transaction.category }
-        if (budgets.isEmpty()) return
-        val calendar = Calendar.getInstance()
+        val calendar = Calendar.getInstance().apply { timeInMillis = transaction.dateMillis }
         val monthKey = SimpleDateFormat("yyyy-MM", Locale.US).format(calendar.time)
-        val start = (calendar.clone() as Calendar).apply {
+        val budgets = dao.allBudgets().filter { it.category == transaction.category && it.monthKey == monthKey }
+        if (budgets.isEmpty()) return
+        val startCalendar = (calendar.clone() as Calendar).apply {
             set(Calendar.DAY_OF_MONTH, 1); set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
-        }.timeInMillis
-        val spent = dao.allTransactions().filter {
-            it.type == "EXPENSE" && it.category == transaction.category && it.dateMillis >= start
+        }
+        val end = (startCalendar.clone() as Calendar).apply { add(Calendar.MONTH, 1) }.timeInMillis
+        val spent = dao.transactionsBetween(startCalendar.timeInMillis, end).filter {
+            it.type == "EXPENSE" && it.category == transaction.category
         }.sumOf { it.amountPaise }
-        budgets.filter { it.monthKey == monthKey }.forEach { budget ->
+        budgets.forEach { budget ->
             val threshold = budget.limitPaise * budget.alertPercent / 100
             val key = "budget-alert-${budget.id}-$monthKey"
             val prefs = context.getSharedPreferences("finance_alert_state", Context.MODE_PRIVATE)
