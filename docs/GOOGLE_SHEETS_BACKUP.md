@@ -1,31 +1,32 @@
-# Google Sheets backup integration
+# Google Sheets backup
 
-The repository includes a Google Sheets REST adapter at
-`GoogleSheetsBackupClient.kt`. It creates a spreadsheet and uploads the
-transaction log as a tabular snapshot. The adapter accepts a short-lived OAuth
-access token; it does not store credentials or embed a client secret.
+The app has an optional **Sheets** action. When the user taps it, Google Identity
+Services requests explicit OAuth consent for the Google Sheets scope. After
+authorization, the app creates a dated spreadsheet snapshot and uploads the
+current transaction log. The short-lived access token is used in memory only;
+the app does not save it or send data automatically.
 
-## Required Google setup
+## One-time Google Cloud setup
 
-1. Create or select a project in Google Cloud Console.
-2. Enable the Google Sheets API.
-3. Configure the OAuth consent screen for the intended test/production audience.
-4. Create an Android OAuth client using application ID
-   `com.skyboys.personalfinance` and the app signing certificate SHA-1.
-5. Request the least-privilege Sheets scope:
+1. Open Google Cloud Console and create/select a project.
+2. Enable the **Google Sheets API**.
+3. Configure the OAuth consent screen and add test users while in testing mode.
+4. Create an **Android OAuth client** for application ID
+   `com.skyboys.personalfinance`.
+5. Add the SHA-1 signing certificate fingerprint for each build you intend to
+   use (debug and release certificates differ).
+6. Ensure the OAuth app is allowed to request
    `https://www.googleapis.com/auth/spreadsheets`.
-6. Obtain user consent and a short-lived access token through Google's Android
-   authorization flow, then call
-   `GoogleSheetsBackupClient().createBackup(accessToken, transactions)`
-   on a background dispatcher.
 
-Do not put OAuth client secrets, refresh tokens, or service-account private keys
-in the APK or Git repository. A user must explicitly authorize the upload.
-Google Sheets backup is optional; local use and encrypted file backups work
-without a Google account or bank connection.
+The project uses Google's Android authorization API. No client secret belongs
+in the APK. Google Sheets access is optional and requires a user action and
+consent each time access is needed. The upload creates a new spreadsheet
+snapshot per run; it does not silently overwrite an existing sheet.
 
-## Current integration boundary
+## Privacy and recovery
 
-The REST upload client is implemented, but the in-app Google OAuth consent and
-"Sync to Sheets" screen still need to be wired after the app's OAuth client
-configuration is supplied. No financial data is sent to Google automatically.
+Local Room storage remains the primary source of truth. Users can also create
+password-encrypted local backup files using the Backup action. Never commit
+OAuth tokens, client secrets, bank credentials or real financial records to
+GitHub. If access is revoked, the local app and encrypted file backup continue
+to work normally.
