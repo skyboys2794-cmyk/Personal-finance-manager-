@@ -41,6 +41,20 @@ interface FinanceDao {
     suspend fun deleteTransfers(transferIds: List<String>)
     @Query("DELETE FROM accounts WHERE id=:id")
     suspend fun deleteAccount(id: Long)
+
+    @Transaction
+    suspend fun deleteAccountSafely(id: Long) {
+        val linkedTransfers = transferIdsForAccount(id)
+        if (linkedTransfers.isNotEmpty()) deleteTransfers(linkedTransfers)
+        detachTransactionsFromAccount(id)
+        detachRemindersFromAccount(id)
+        deleteAccount(id)
+    }
+
+    @Transaction
+    suspend fun insertTransferPair(outgoing: FinanceTransaction, incoming: FinanceTransaction) {
+        insertAll(listOf(outgoing, incoming))
+    }
     @Query("SELECT * FROM budgets ORDER BY category")
     fun observeBudgets(): Flow<List<FinanceBudget>>
     @Query("SELECT * FROM budgets ORDER BY category")
