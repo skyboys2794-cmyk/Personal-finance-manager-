@@ -303,7 +303,7 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
                 onPeriodChange = { dashboardPeriod = it },
                 onCustomRange = { chooseCustomRange() }
             )
-            1 -> ActivityList(Modifier.padding(padding), transactions, onEdit = { editingTransaction = it }, onDelete = { id -> scope.launch(Dispatchers.IO) { dao.delete(id) } })
+            1 -> ActivityList(Modifier.padding(padding), transactions, onEdit = { editingTransaction = it }, onDelete = { id -> scope.launch(Dispatchers.IO) { dao.deleteTransactionSafely(id) } })
             2 -> AccountManagementScreen(Modifier.padding(padding), accounts, dao)
             3 -> ManagementScreen(dao, Modifier.padding(padding))
             else -> FinanceSettingsScreen(
@@ -621,7 +621,7 @@ private fun TransactionRow(transaction: FinanceTransaction, onDelete: (() -> Uni
                 Text((if (transaction.type == "INCOME") "+" else "−") + money(transaction.amountPaise), color = if (transaction.type == "INCOME") Forest else Coral, fontWeight = FontWeight.Bold)
                 if (onEdit != null || onDelete != null) {
                     Row {
-                        if (onEdit != null) IconButton(onClick = onEdit) { Icon(Icons.Default.Edit, contentDescription = "Edit transaction", tint = Muted) }
+                        if (onEdit != null && transaction.transferId == null) IconButton(onClick = onEdit) { Icon(Icons.Default.Edit, contentDescription = "Edit transaction", tint = Muted) }
                         if (onDelete != null) IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, contentDescription = "Delete transaction", tint = Muted) }
                     }
                 }
