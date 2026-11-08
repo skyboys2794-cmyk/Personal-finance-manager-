@@ -21,6 +21,15 @@ interface FinanceDao {
     suspend fun updateTransaction(id: Long, title: String, amountPaise: Long, type: String, category: String, accountId: Long?, paymentMethod: String, tags: String, notes: String, isRecurring: Boolean, recurrenceFrequency: String)
     @Query("DELETE FROM transactions WHERE id = :id")
     suspend fun delete(id: Long)
+    @Query("SELECT * FROM transactions WHERE id = :id LIMIT 1")
+    suspend fun transactionById(id: Long): FinanceTransaction?
+
+    @Transaction
+    suspend fun deleteTransactionSafely(id: Long) {
+        val transaction = transactionById(id) ?: return
+        if (transaction.transferId != null) deleteTransfers(listOf(transaction.transferId))
+        else delete(id)
+    }
     @Query("SELECT * FROM accounts ORDER BY name")
     fun observeAccounts(): Flow<List<FinanceAccount>>
     @Query("SELECT * FROM accounts ORDER BY name")
