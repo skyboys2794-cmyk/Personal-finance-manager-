@@ -732,7 +732,7 @@ private fun AddTransactionDialog(
     var type by remember(initial?.id) { mutableStateOf(initial?.type ?: "EXPENSE") }
     var category by remember(initial?.id) { mutableStateOf(initial?.category ?: "Food") }
     var method by remember(initial?.id) { mutableStateOf(initial?.paymentMethod ?: "UPI") }
-    var accountId by remember(initial?.id) { mutableStateOf(initial?.accountId ?: accounts.firstOrNull { it.type == "BANK" }?.id ?: accounts.firstOrNull()?.id) }
+    var accountId by remember(initial?.id) { mutableStateOf(if (initial != null) initial.accountId else accounts.firstOrNull { it.type == "BANK" }?.id ?: accounts.firstOrNull()?.id) }
     var tags by remember(initial?.id) { mutableStateOf(initial?.tags.orEmpty()) }
     var recurring by remember(initial?.id) { mutableStateOf(initial?.isRecurring ?: false) }
     var frequency by remember(initial?.id) { mutableStateOf(initial?.recurrenceFrequency ?: "MONTHLY") }
@@ -750,7 +750,7 @@ private fun AddTransactionDialog(
         "WALLET" -> accounts.filter { it.type == "WALLET" }
         else -> accounts.filter { it.type == "BANK" || it.type == "WALLET" }
     }
-    val selectedAccountId = if (eligibleAccounts.any { it.id == accountId }) accountId else eligibleAccounts.firstOrNull()?.id
+    val selectedAccountId = if (initial != null && accountId == null) null else if (eligibleAccounts.any { it.id == accountId }) accountId else eligibleAccounts.firstOrNull()?.id
     val validAmount = amount.toBigDecimalOrNull()?.let { it.signum() > 0 && it.toDouble().isFinite() } == true
     fun methodLabel(value: String) = when (value) {
         "UPI" -> "UPI"
