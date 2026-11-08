@@ -12,7 +12,9 @@ data class FinanceAccount(
     val type: String = "BANK",
     val openingBalancePaise: Long = 0,
     val currency: String = "INR",
-    val isIncludedInNetWorth: Boolean = true
+    val isIncludedInNetWorth: Boolean = true,
+    val creditLimitPaise: Long = 0,
+    val statementDueDay: Int = 0
 )
 
 @Entity(tableName = "budgets", indices = [Index(value = ["category", "monthKey"], unique = true)])
