@@ -31,6 +31,21 @@ jobs:
       - name: Run JVM unit tests
         run: gradle --no-daemon testDebugUnitTest
 
+      # Produce the installable APK before emulator UI tests. A slow or
+      # unavailable emulator must not prevent a valid APK from being uploaded.
+      - name: Build debug APK
+        id: build_apk
+        run: gradle --no-daemon assembleDebug
+
+      - name: Upload APK
+        if: always() && steps.build_apk.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: personal-finance-manager-debug-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Run Android emulator tests
         uses: reactivecircus/android-emulator-runner@v2
         with:
@@ -42,14 +57,3 @@ jobs:
           disable-animations: true
           script: |
             gradle --no-daemon connectedDebugAndroidTest --stacktrace || { adb logcat -d -t 2500 | tail -n 250; exit 1; }
-
-      - name: Build debug APK
-        run: gradle --no-daemon assembleDebug
-
-      - name: Upload APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: personal-finance-manager-debug-apk
-          path: app/build/outputs/apk/debug/app-debug.apk
-          if-no-files-found: error
-          retention-days: 14
