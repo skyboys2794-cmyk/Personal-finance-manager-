@@ -59,7 +59,7 @@ secrets, access tokens, bank credentials or real financial data.
 - `reports/`: monthly cash-flow and category analytics.
 - `notifications/`: bill reminder worker and budget threshold notification logic.
 
-The next UI milestone is full CRUD for accounts, budgets and bill reminders,
-plus a dedicated reports/settings area and Google OAuth consent flow. Dashboard
-widget preferences and account/card balance reconciliation also remain to be
-completed. Review imported bank CSV sign conventions before relying on totals.
+Accounts can be added manually; monthly budgets and bill reminders can be configured
+in the Plans tab. The next milestones are account editing/deletion, richer reports,
+credit-card payment reconciliation and dashboard widget expansion. Budget threshold
+alerts are evaluated on newly recorded expenses; bill reminder checks run daily. Review imported bank CSV sign conventions before relying on totals.
