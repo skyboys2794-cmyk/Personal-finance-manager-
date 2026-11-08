@@ -53,6 +53,7 @@ import com.google.android.gms.common.api.Scope
 import com.skyboys.personalfinance.data.FinanceAccount
 import com.skyboys.personalfinance.data.FinanceDatabase
 import com.skyboys.personalfinance.data.FinanceTransaction
+import com.skyboys.personalfinance.categorization.MerchantMemory
 import com.skyboys.personalfinance.importer.CsvTransactionParser
 import com.skyboys.personalfinance.reports.FinanceAnalytics
 import com.skyboys.personalfinance.notifications.FinanceNotifications
@@ -330,6 +331,7 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
                 category = category, accountId = accountId, paymentMethod = method, tags = tags,
                 isRecurring = recurring, recurrenceFrequency = frequency)
             dao.insert(transaction)
+            MerchantMemory.rememberCorrection(dao, transaction.title, transaction.category)
             BudgetAlertEvaluator.evaluate(context, transaction)
         }
         showAdd = false
@@ -358,6 +360,7 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
                         updated.accountId, updated.paymentMethod, updated.tags, updated.notes,
                         updated.isRecurring, updated.recurrenceFrequency
                     )
+                    MerchantMemory.rememberCorrection(dao, updated.title, updated.category)
                     BudgetAlertEvaluator.evaluate(context, updated)
                 }
                 editingTransaction = null
