@@ -73,7 +73,15 @@ fun ManagementScreen(dao: FinanceDao) {
                         Text(bill.title, fontWeight = FontWeight.SemiBold)
                         Text("Due every month on day ${bill.dueDay}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    Text("₹${"%.2f".format(Locale.US, bill.amountPaise / 100.0)}", fontWeight = FontWeight.Bold)
+                    Column(horizontalAlignment = androidx.compose.ui.Alignment.End) {
+                        Text("₹${"%.2f".format(Locale.US, bill.amountPaise / 100.0)}", fontWeight = FontWeight.Bold)
+                        Switch(
+                            checked = bill.enabled,
+                            onCheckedChange = { enabled ->
+                                scope.launch(Dispatchers.IO) { dao.saveReminder(bill.copy(enabled = enabled)) }
+                            }
+                        )
+                    }
                 }
             }
         }
