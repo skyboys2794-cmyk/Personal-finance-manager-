@@ -26,7 +26,7 @@ import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ManagementScreen(dao: FinanceDao) {
+fun ManagementScreen(dao: FinanceDao, modifier: Modifier = Modifier) {
     val budgets by dao.observeBudgets().collectAsStateWithLifecycle(emptyList())
     val reminders by dao.observeReminders().collectAsStateWithLifecycle(emptyList())
     val scope = rememberCoroutineScope()
@@ -40,7 +40,7 @@ fun ManagementScreen(dao: FinanceDao) {
     val categories = listOf("Food", "Travel", "Bills", "Shopping", "Health", "Salary", "Business", "Other")
 
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(18.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
