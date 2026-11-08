@@ -127,7 +127,9 @@ class RecurringTransactionWorker(context: Context, params: WorkerParameters) : C
             }
             var generated = 0
             while (next.timeInMillis <= now && generated < 24) {
-                dao.insert(source.copy(id = 0, dateMillis = next.timeInMillis, isRecurring = false))
+                val generatedTransaction = source.copy(id = 0, dateMillis = next.timeInMillis, isRecurring = false)
+                dao.insert(generatedTransaction)
+                BudgetAlertEvaluator.evaluate(applicationContext, generatedTransaction)
                 lastGenerated = next.timeInMillis
                 preferences.edit().putLong("last-generated-${source.id}", lastGenerated).commit()
                 next = Calendar.getInstance().apply {
