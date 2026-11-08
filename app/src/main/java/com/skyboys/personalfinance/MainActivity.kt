@@ -181,7 +181,7 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
                     }
                     fun duplicateKey(item: FinanceTransaction): String {
                         val day = SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(Date(item.dateMillis))
-                        return "$day|${item.title.trim().lowercase(Locale.ROOT)}|${item.amountPaise}|${item.type}"
+                        return "$day|${item.title.trim().lowercase(Locale.ROOT)}|${item.amountPaise}|${item.type}|${item.accountId ?: "unassigned"}"
                     }
                     val existing = dao.allTransactions().map(::duplicateKey).toMutableSet()
                     val unique = mapped.filter { existing.add(duplicateKey(it)) }
