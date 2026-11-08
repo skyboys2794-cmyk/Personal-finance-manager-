@@ -14,17 +14,23 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.font.FontWeight
 import com.skyboys.personalfinance.data.FinanceTransaction
 import com.skyboys.personalfinance.reports.FinanceAnalytics
+import com.skyboys.personalfinance.intelligence.FinanceInsights
 import java.util.Calendar
 
 private enum class ReportChart { BAR, LINE, DONUT }
 
 @Composable
-fun AdvancedReports(modifier: Modifier = Modifier, transactions: List<FinanceTransaction>) {
+fun AdvancedReports(modifier: Modifier = Modifier, transactions: List<FinanceTransaction>, allTransactions: List<FinanceTransaction> = transactions) {
     var chart by remember { mutableStateOf(ReportChart.BAR) }
     var months by remember { mutableIntStateOf(6) }
     val trend = remember(transactions, months) { FinanceAnalytics.monthlyTrend(transactions, months) }
     val summary = remember(transactions) { FinanceAnalytics.summarize(transactions) }
     val categories = summary.expenseByCategory.entries.toList()
+    val projection = remember(allTransactions) { FinanceInsights.projectMonthEndExpense(allTransactions) }
+    val savingsRate = FinanceInsights.savingsRatePercent(summary.incomePaise, summary.expensePaise)
+    val previousMonthExpense = trend.dropLast(1).lastOrNull()?.expensePaise ?: 0L
+    val expenseChange = FinanceInsights.expenseChangePercent(previousMonthExpense, summary.expensePaise)
+    fun inr(paise: Long) = "₹" + String.format(java.util.Locale("en", "IN"), "%,.2f", paise / 100.0)
     val maxValue = (trend.flatMap { listOf(it.incomePaise, it.expensePaise) }.maxOrNull() ?: 1L).coerceAtLeast(1L).toFloat()
     val incomeColor = MaterialTheme.colorScheme.primary
     val expenseColor = MaterialTheme.colorScheme.error
@@ -98,6 +104,25 @@ fun AdvancedReports(modifier: Modifier = Modifier, transactions: List<FinanceTra
                 Text("Income  ₹"+String.format(java.util.Locale("en","IN"),"%,.2f",summary.incomePaise/100.0))
                 Text("Expenses  ₹"+String.format(java.util.Locale("en","IN"),"%,.2f",summary.expensePaise/100.0))
                 Text("Net cash flow  ₹"+String.format(java.util.Locale("en","IN"),"%,.2f",summary.netCashFlowPaise/100.0),fontWeight=FontWeight.Bold)
+            }
+        }
+        Card(shape=RoundedCornerShape(20.dp)) {
+            Column(Modifier.padding(16.dp), verticalArrangement=Arrangement.spacedBy(10.dp)) {
+                Text("Smart money insights", fontWeight=FontWeight.SemiBold)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement=Arrangement.SpaceBetween) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Savings rate", style=MaterialTheme.typography.labelSmall, color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(savingsRate?.let { String.format(java.util.Locale.getDefault(), "%.1f%%", it) } ?: "Add income", style=MaterialTheme.typography.titleLarge, fontWeight=FontWeight.Bold)
+                    }
+                    Column(Modifier.weight(1f)) {
+                        Text("Expense change", style=MaterialTheme.typography.labelSmall, color=MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(expenseChange?.let { (if (it > 0) "+" else "") + String.format(java.util.Locale.getDefault(), "%.1f%%", it) } ?: "No comparison", style=MaterialTheme.typography.titleLarge, fontWeight=FontWeight.Bold)
+                    }
+                }
+                HorizontalDivider()
+                Text("Estimated month-end spending", style=MaterialTheme.typography.labelSmall, color=MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(inr(projection.projectedMonthEndPaise), style=MaterialTheme.typography.headlineSmall, fontWeight=FontWeight.Bold)
+                Text("Based on ${projection.elapsedDays} of ${projection.totalDays} days and spending recorded so far. This is an estimate, not a guaranteed forecast.", style=MaterialTheme.typography.bodySmall, color=MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
