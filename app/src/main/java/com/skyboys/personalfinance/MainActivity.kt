@@ -457,7 +457,7 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
                     Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), horizontalArrangement = Arrangement.End) {
                         TextButton(onClick = { reportsDialog = false }) { Text("Close reports") }
                     }
-                    AdvancedReports(Modifier.weight(1f).fillMaxWidth(), periodTransactions)
+                    AdvancedReports(Modifier.weight(1f).fillMaxWidth(), periodTransactions, transactions)
                 }
             }
         }
