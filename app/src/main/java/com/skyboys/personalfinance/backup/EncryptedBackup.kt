@@ -35,12 +35,14 @@ object EncryptedBackup {
                     .put("id", t.id).put("title", t.title).put("amountPaise", t.amountPaise)
                     .put("type", t.type).put("category", t.category).put("dateMillis", t.dateMillis)
                     .put("accountId", t.accountId ?: JSONObject.NULL).put("paymentMethod", t.paymentMethod)
-                    .put("tags", t.tags).put("notes", t.notes).put("transferId", t.transferId ?: JSONObject.NULL)) }
+                    .put("tags", t.tags).put("notes", t.notes).put("transferId", t.transferId ?: JSONObject.NULL)
+                    .put("isRecurring", t.isRecurring).put("recurrenceFrequency", t.recurrenceFrequency)) }
             })
             root.put("accounts", JSONArray().apply {
                 data.accounts.forEach { a -> put(JSONObject().put("id", a.id).put("name", a.name)
                     .put("institution", a.institution).put("type", a.type).put("openingBalancePaise", a.openingBalancePaise)
-                    .put("currency", a.currency).put("isIncludedInNetWorth", a.isIncludedInNetWorth)) }
+                    .put("currency", a.currency).put("isIncludedInNetWorth", a.isIncludedInNetWorth)
+                    .put("creditLimitPaise", a.creditLimitPaise).put("statementDueDay", a.statementDueDay)) }
             })
             root.put("budgets", JSONArray().apply {
                 data.budgets.forEach { b -> put(JSONObject().put("id", b.id).put("category", b.category)
@@ -71,14 +73,16 @@ object EncryptedBackup {
                 accountId = if (version >= 2 && !t.isNull("accountId")) t.getLong("accountId") else null,
                 paymentMethod = t.optString("paymentMethod", "CASH"), tags = t.optString("tags", ""),
                 notes = t.optString("notes", ""),
-                transferId = if (version >= 2 && !t.isNull("transferId")) t.getString("transferId") else null
+                transferId = if (version >= 2 && !t.isNull("transferId")) t.getString("transferId") else null,
+                isRecurring = t.optBoolean("isRecurring", false), recurrenceFrequency = t.optString("recurrenceFrequency", "MONTHLY")
             )
         }
         if (version == 1) return FinanceBackupData(transactions, emptyList(), emptyList(), emptyList())
         val accounts = root.getJSONArray("accounts").objects().map { a -> FinanceAccount(
             id=a.getLong("id"), name=a.getString("name"), institution=a.optString("institution", ""),
             type=a.optString("type", "BANK"), openingBalancePaise=a.optLong("openingBalancePaise", 0),
-            currency=a.optString("currency", "INR"), isIncludedInNetWorth=a.optBoolean("isIncludedInNetWorth", true)
+            currency=a.optString("currency", "INR"), isIncludedInNetWorth=a.optBoolean("isIncludedInNetWorth", true),
+            creditLimitPaise=a.optLong("creditLimitPaise", 0), statementDueDay=a.optInt("statementDueDay", 0)
         ) }
         val budgets = root.getJSONArray("budgets").objects().map { b -> FinanceBudget(
             id=b.getLong("id"), category=b.getString("category"), limitPaise=b.getLong("limitPaise"),
