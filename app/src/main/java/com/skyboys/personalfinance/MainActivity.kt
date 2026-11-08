@@ -169,17 +169,28 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
             try {
                 val csv = withContext(Dispatchers.IO) { context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() } ?: "" }
                 val parsed = withContext(Dispatchers.Default) { CsvTransactionParser.parse(csv) }
-                val importedCount = withContext(Dispatchers.IO) {
-                    val existing = dao.allTransactions().map { "${it.dateMillis}|${it.title.lowercase(Locale.ROOT)}|${it.amountPaise}|${it.type}" }.toMutableSet()
-                    val unique = parsed.transactions.filter { existing.add("${it.dateMillis}|${it.title.lowercase(Locale.ROOT)}|${it.amountPaise}|${it.type}") }
+                val importResult = withContext(Dispatchers.IO) {
+                    val accountsByName = dao.allAccounts().associateBy { it.name.trim().lowercase(Locale.ROOT) }
+                    val mapped = parsed.transactions.mapIndexed { index, transaction ->
+                        val accountName = parsed.accountNames.getOrNull(index)
+                        transaction.copy(accountId = accountName?.let { accountsByName[it.trim().lowercase(Locale.ROOT)]?.id })
+                    }
+                    fun duplicateKey(item: FinanceTransaction): String {
+                        val day = SimpleDateFormat("yyyy-MM-dd", Locale.ROOT).format(Date(item.dateMillis))
+                        return "$day|${item.title.trim().lowercase(Locale.ROOT)}|${item.amountPaise}|${item.type}"
+                    }
+                    val existing = dao.allTransactions().map(::duplicateKey).toMutableSet()
+                    val unique = mapped.filter { existing.add(duplicateKey(it)) }
                     if (unique.isNotEmpty()) {
                         dao.insertAll(unique)
                         unique.forEach { BudgetAlertEvaluator.evaluate(context, it) }
                     }
-                    unique.size
+                    Triple(unique.size, mapped.count { it.accountId == null }, unique)
                 }
+                val importedCount = importResult.first
+                val unmatchedAccounts = importResult.second
                 val skipped = parsed.errors.size + parsed.transactions.size - importedCount
-                Toast.makeText(context, "Imported $importedCount transactions. $skipped rows skipped or already present.", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, "Imported $importedCount transactions. $skipped rows skipped or already present. $unmatchedAccounts left without a matched account.", Toast.LENGTH_LONG).show()
             } catch (e: Exception) {
                 Toast.makeText(context, "CSV import failed: ${e.message}", Toast.LENGTH_LONG).show()
             }
