@@ -35,6 +35,10 @@ interface FinanceDao {
     suspend fun detachTransactionsFromAccount(accountId: Long)
     @Query("UPDATE bill_reminders SET accountId=NULL WHERE accountId=:accountId")
     suspend fun detachRemindersFromAccount(accountId: Long)
+    @Query("SELECT DISTINCT transferId FROM transactions WHERE accountId=:accountId AND transferId IS NOT NULL")
+    suspend fun transferIdsForAccount(accountId: Long): List<String>
+    @Query("DELETE FROM transactions WHERE transferId IN (:transferIds)")
+    suspend fun deleteTransfers(transferIds: List<String>)
     @Query("DELETE FROM accounts WHERE id=:id")
     suspend fun deleteAccount(id: Long)
     @Query("SELECT * FROM budgets ORDER BY category")
