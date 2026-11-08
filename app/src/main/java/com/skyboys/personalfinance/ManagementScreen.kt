@@ -98,7 +98,7 @@ fun ManagementScreen(dao: FinanceDao) {
                 }
             },
             confirmButton = {
-                TextButton(enabled = validAmount && title.isNotBlank() && (mode != "bill" || dueDay.toIntOrNull() in 1..31), onClick = {
+                TextButton(enabled = validAmount && title.isNotBlank() && (mode != "bill" || dueDay.toIntOrNull()?.let { it in 1..31 } == true), onClick = {
                     val paise = (amount.toDouble() * 100).toLong()
                     scope.launch(Dispatchers.IO) {
                         if (mode == "budget") {
