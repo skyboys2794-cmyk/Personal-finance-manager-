@@ -17,8 +17,8 @@ interface FinanceDao {
     suspend fun insert(transaction: FinanceTransaction): Long
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(transactions: List<FinanceTransaction>)
-    @Query("UPDATE transactions SET title=:title, amountPaise=:amountPaise, type=:type, category=:category, accountId=:accountId, paymentMethod=:paymentMethod, tags=:tags, notes=:notes WHERE id=:id")
-    suspend fun updateTransaction(id: Long, title: String, amountPaise: Long, type: String, category: String, accountId: Long?, paymentMethod: String, tags: String, notes: String)
+    @Query("UPDATE transactions SET title=:title, amountPaise=:amountPaise, type=:type, category=:category, accountId=:accountId, paymentMethod=:paymentMethod, tags=:tags, notes=:notes, isRecurring=:isRecurring, recurrenceFrequency=:recurrenceFrequency WHERE id=:id")
+    suspend fun updateTransaction(id: Long, title: String, amountPaise: Long, type: String, category: String, accountId: Long?, paymentMethod: String, tags: String, notes: String, isRecurring: Boolean, recurrenceFrequency: String)
     @Query("DELETE FROM transactions WHERE id = :id")
     suspend fun delete(id: Long)
     @Query("SELECT * FROM accounts ORDER BY name")
