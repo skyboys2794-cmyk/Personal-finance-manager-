@@ -26,10 +26,14 @@ interface FinanceDao {
     suspend fun insertAccount(account: FinanceAccount): Long
     @Query("SELECT * FROM budgets ORDER BY category")
     fun observeBudgets(): Flow<List<FinanceBudget>>
+    @Query("SELECT * FROM budgets ORDER BY category")
+    suspend fun allBudgets(): List<FinanceBudget>
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun saveBudget(budget: FinanceBudget)
     @Query("SELECT * FROM bill_reminders ORDER BY dueDay")
     fun observeReminders(): Flow<List<BillReminder>>
+    @Query("SELECT * FROM bill_reminders WHERE enabled = 1 ORDER BY dueDay")
+    suspend fun allReminders(): List<BillReminder>
     @Insert
     suspend fun saveReminder(reminder: BillReminder)
     @Query("SELECT * FROM transactions WHERE dateMillis >= :start AND dateMillis < :end")
