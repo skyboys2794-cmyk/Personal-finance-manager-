@@ -57,7 +57,8 @@ class BillReminderWorker(context: Context, params: WorkerParameters) : Coroutine
         val monthDays = today.getActualMaximum(Calendar.DAY_OF_MONTH)
         val preferences = applicationContext.getSharedPreferences("finance_alert_state", Context.MODE_PRIVATE)
         reminders.filter { it.enabled && it.dueDay in 1..31 }.forEach { bill ->
-            val daysUntilDue = (bill.dueDay - day + monthDays) % monthDays
+            val effectiveDueDay = bill.dueDay.coerceAtMost(monthDays)
+            val daysUntilDue = (effectiveDueDay - day + monthDays) % monthDays
             val alertKey = "bill-reminder-${bill.id}-${today.get(Calendar.YEAR)}-${today.get(Calendar.DAY_OF_YEAR)}"
             if (daysUntilDue in 0..3 && !preferences.getBoolean(alertKey, false)) {
                 FinanceNotifications.notify(
