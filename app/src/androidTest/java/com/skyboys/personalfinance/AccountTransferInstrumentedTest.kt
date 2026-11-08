@@ -19,8 +19,8 @@ class AccountTransferInstrumentedTest {
     @Test fun accountCanBeEditedDeletedAndTransfersRemainPaired() = runBlocking {
         val dao = FinanceDatabase.get(InstrumentationRegistry.getInstrumentation().targetContext).financeDao()
         val suffix = UUID.randomUUID().toString().take(8)
-        val fromId = dao.insertAccount(FinanceAccount(name="Test source $suffix", creditLimitPaise=0, statementDueDay=0))
-        val toId = dao.insertAccount(FinanceAccount(name="Test destination $suffix", creditLimitPaise=0, statementDueDay=0))
+        val fromId = dao.insertAccount(FinanceAccount(name="Test source $suffix", creditLimitPaise=0, statementDueDay=0, balanceAsOfMillis=0))
+        val toId = dao.insertAccount(FinanceAccount(name="Test destination $suffix", creditLimitPaise=0, statementDueDay=0, balanceAsOfMillis=0))
         val transferId = UUID.randomUUID().toString()
         dao.insertTransferPair(
             FinanceTransaction(title="Transfer out", amountPaise=1500, type="TRANSFER_OUT", category="Transfers", accountId=fromId, transferId=transferId),
