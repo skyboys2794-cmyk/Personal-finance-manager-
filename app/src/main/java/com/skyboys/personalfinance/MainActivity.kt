@@ -188,7 +188,10 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
                         dao.insertAll(unique)
                         unique.forEach { BudgetAlertEvaluator.evaluate(context, it) }
                     }
-                    Triple(unique.size, mapped.count { it.accountId == null }, unique)
+                    val unmatchedAccounts = mapped.indices.count { index ->
+                        !parsed.accountNames.getOrNull(index).isNullOrBlank() && mapped[index].accountId == null
+                    }
+                    Pair(unique.size, unmatchedAccounts)
                 }
                 val importedCount = importResult.first
                 val unmatchedAccounts = importResult.second
