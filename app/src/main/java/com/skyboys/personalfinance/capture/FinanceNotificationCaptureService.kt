@@ -6,6 +6,7 @@ import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import com.skyboys.personalfinance.data.FinanceDatabase
 import com.skyboys.personalfinance.data.FinanceTransaction
+import com.skyboys.personalfinance.categorization.MerchantMemory
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -45,6 +46,7 @@ class FinanceNotificationCaptureService : NotificationListenerService() {
                     ?: accounts.firstOrNull { it.type == preferredType }?.id
                     ?: accounts.firstOrNull { it.type == "WALLET" }?.id
                 val transactionTime = sbn.postTime.takeIf { it > 0L } ?: System.currentTimeMillis()
+                val learnedCategory = MerchantMemory.learnedCategory(dao, parsed.title) ?: parsed.category
                 val duplicate = dao.allTransactions().any { item ->
                     item.amountPaise == parsed.amountPaise && item.type == parsed.type &&
                         abs(item.dateMillis - transactionTime) <= 90_000L && item.tags.contains(TAG_CAPTURE)
@@ -52,9 +54,9 @@ class FinanceNotificationCaptureService : NotificationListenerService() {
                 if (!duplicate) {
                     dao.insert(FinanceTransaction(
                         title = parsed.title, amountPaise = parsed.amountPaise, type = parsed.type,
-                        category = parsed.category, dateMillis = transactionTime, accountId = accountId,
+                        category = learnedCategory, dateMillis = transactionTime, accountId = accountId,
                         paymentMethod = parsed.paymentMethod,
-                        tags = "$TAG_CAPTURE;SOURCE=${sbn.packageName};${if (parsed.category == "Other") "CATEGORY_REVIEW" else "AUTO_CATEGORIZED"}",
+                        tags = "$TAG_CAPTURE;SOURCE=${sbn.packageName};${if (learnedCategory != "Other") "USER_LEARNED_CATEGORY" else "CATEGORY_REVIEW"}",
                         notes = "Captured locally from an app notification"
                     ))
                 }
