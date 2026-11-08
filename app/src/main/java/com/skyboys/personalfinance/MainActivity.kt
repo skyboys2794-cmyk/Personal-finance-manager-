@@ -1,6 +1,7 @@
 package com.skyboys.personalfinance
 
 import android.os.Bundle
+import android.app.DatePickerDialog
 import android.os.Build
 import android.Manifest
 import android.widget.Toast
@@ -58,6 +59,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
+import java.util.Calendar
 import java.util.Locale
 
 private val Forest = Color(0xFF087F73)
@@ -111,7 +113,54 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
     var reportsDialog by remember { mutableStateOf(false) }
     var showSpending by remember { mutableStateOf(context.getSharedPreferences("dashboard_prefs", 0).getBoolean("show_spending", true)) }
     var showRecent by remember { mutableStateOf(context.getSharedPreferences("dashboard_prefs", 0).getBoolean("show_recent", true)) }
-    val summary = remember(transactions) { FinanceAnalytics.summarize(transactions) }
+    var dashboardPeriod by remember { mutableStateOf("THIS_MONTH") }
+    var customStartMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    var customEndMillis by remember { mutableLongStateOf(System.currentTimeMillis()) }
+    val periodBounds = remember(dashboardPeriod, customStartMillis, customEndMillis) {
+        val now = Calendar.getInstance()
+        val start = when (dashboardPeriod) {
+            "LAST_MONTH" -> (now.clone() as Calendar).apply { add(Calendar.MONTH, -1); set(Calendar.DAY_OF_MONTH, 1); set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }
+            "CUSTOM" -> Calendar.getInstance().apply { timeInMillis = customStartMillis; set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }
+            else -> (now.clone() as Calendar).apply { set(Calendar.DAY_OF_MONTH, 1); set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }
+        }
+        val end = when (dashboardPeriod) {
+            "LAST_MONTH" -> (start.clone() as Calendar).apply { add(Calendar.MONTH, 1) }
+            "CUSTOM" -> Calendar.getInstance().apply { timeInMillis = customEndMillis; add(Calendar.DAY_OF_MONTH, 1); set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }
+            else -> (start.clone() as Calendar).apply { add(Calendar.MONTH, 1) }
+        }
+        Triple(start.timeInMillis, end.timeInMillis, when (dashboardPeriod) {
+            "LAST_MONTH" -> "Last month"
+            "CUSTOM" -> "${SimpleDateFormat("dd MMM", Locale.getDefault()).format(Date(customStartMillis))} – ${SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(customEndMillis))}"
+            else -> "This month"
+        })
+    }
+    val summary = remember(transactions, periodBounds) {
+        FinanceAnalytics.summarizeRange(transactions, periodBounds.first, periodBounds.second, periodBounds.third)
+    }
+    val periodDuration = (periodBounds.second - periodBounds.first).coerceAtLeast(1L)
+    val previousPeriodExpense = remember(transactions, periodBounds) {
+        FinanceAnalytics.summarizeRange(transactions, periodBounds.first - periodDuration, periodBounds.first, "Previous period").expensePaise
+    }
+    val periodTransactions = remember(transactions, periodBounds) {
+        transactions.filter { it.dateMillis >= periodBounds.first && it.dateMillis < periodBounds.second }
+    }
+    fun chooseCustomRange() {
+        val startCal = Calendar.getInstance().apply { timeInMillis = customStartMillis }
+        DatePickerDialog(context, { _, sy, sm, sd ->
+            val selectedStart = Calendar.getInstance().apply { set(sy, sm, sd, 0, 0, 0); set(Calendar.MILLISECOND, 0) }
+            val endCal = Calendar.getInstance().apply { timeInMillis = customEndMillis }
+            DatePickerDialog(context, { _, ey, em, ed ->
+                val selectedEnd = Calendar.getInstance().apply { set(ey, em, ed, 0, 0, 0); set(Calendar.MILLISECOND, 0) }
+                if (selectedEnd.timeInMillis >= selectedStart.timeInMillis) {
+                    customStartMillis = selectedStart.timeInMillis
+                    customEndMillis = selectedEnd.timeInMillis
+                    dashboardPeriod = "CUSTOM"
+                } else {
+                    Toast.makeText(context, "End date must be on or after start date.", Toast.LENGTH_SHORT).show()
+                }
+            }, endCal.get(Calendar.YEAR), endCal.get(Calendar.MONTH), endCal.get(Calendar.DAY_OF_MONTH)).show()
+        }, startCal.get(Calendar.YEAR), startCal.get(Calendar.MONTH), startCal.get(Calendar.DAY_OF_MONTH)).show()
+    }
 
     val csvPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) scope.launch {
@@ -214,13 +263,22 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
             }
         },
         floatingActionButton = {
-            FloatingActionButton(onClick = { showAdd = true }, containerColor = Forest, contentColor = Color.White) {
-                Icon(Icons.Default.Add, contentDescription = "Add transaction")
+            if (tab == 0 || tab == 1) {
+                FloatingActionButton(onClick = { showAdd = true }, containerColor = Forest, contentColor = Color.White) {
+                    Icon(Icons.Default.Add, contentDescription = "Add transaction")
+                }
             }
         }
     ) { padding ->
         when (tab) {
-            0 -> Dashboard(Modifier.padding(padding), transactions, accounts, summary.incomePaise, summary.expensePaise, summary.netCashFlowPaise, summary.expenseByCategory, showSpending, showRecent)
+            0 -> Dashboard(
+                Modifier.padding(padding), transactions, periodTransactions, accounts,
+                summary.incomePaise, summary.expensePaise, summary.netCashFlowPaise,
+                summary.expenseByCategory, showSpending, showRecent, periodBounds.third,
+                previousPeriodExpense, dashboardPeriod,
+                onPeriodChange = { dashboardPeriod = it },
+                onCustomRange = { chooseCustomRange() }
+            )
             1 -> ActivityList(Modifier.padding(padding), transactions) { id -> scope.launch(Dispatchers.IO) { dao.delete(id) } }
             2 -> AccountManagementScreen(Modifier.padding(padding), accounts, dao)
             3 -> ManagementScreen(dao)
@@ -312,7 +370,23 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
 }
 
 @Composable
-private fun Dashboard(modifier: Modifier, transactions: List<FinanceTransaction>, accounts: List<FinanceAccount>, income: Long, expenses: Long, netFlow: Long, categories: Map<String, Long>, showSpending: Boolean, showRecent: Boolean) {
+private fun Dashboard(
+    modifier: Modifier,
+    transactions: List<FinanceTransaction>,
+    periodTransactions: List<FinanceTransaction>,
+    accounts: List<FinanceAccount>,
+    income: Long,
+    expenses: Long,
+    netFlow: Long,
+    categories: Map<String, Long>,
+    showSpending: Boolean,
+    showRecent: Boolean,
+    periodLabel: String,
+    previousPeriodExpense: Long,
+    selectedPeriod: String,
+    onPeriodChange: (String) -> Unit,
+    onCustomRange: () -> Unit
+) {
     val bankAccounts = accounts.filter { it.type != "CREDIT_CARD" }
     val creditCards = accounts.filter { it.type == "CREDIT_CARD" }
     fun balanceOf(account: FinanceAccount): Long = account.openingBalancePaise + transactions.filter { it.accountId == account.id }.sumOf {
@@ -320,14 +394,19 @@ private fun Dashboard(modifier: Modifier, transactions: List<FinanceTransaction>
     }
     val cashAndBank = bankAccounts.sumOf { balanceOf(it) }
     val cardUsed = creditCards.sumOf { (-balanceOf(it)).coerceAtLeast(0L) }
-    val trend = remember(transactions) { FinanceAnalytics.monthlyTrend(transactions, 2) }
-    val previousSpend = trend.firstOrNull()?.expensePaise ?: 0L
-    val spendingChange = if (previousSpend > 0L) ((expenses - previousSpend).toDouble() / previousSpend.toDouble() * 100.0).toInt() else 0
+    val spendingChange = if (previousPeriodExpense > 0L) ((expenses - previousPeriodExpense).toDouble() / previousPeriodExpense.toDouble() * 100.0).toInt() else 0
     LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 96.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        item {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(selected = selectedPeriod == "THIS_MONTH", onClick = { onPeriodChange("THIS_MONTH") }, label = { Text("This month") })
+                FilterChip(selected = selectedPeriod == "LAST_MONTH", onClick = { onPeriodChange("LAST_MONTH") }, label = { Text("Last month") })
+                FilterChip(selected = selectedPeriod == "CUSTOM", onClick = onCustomRange, label = { Text("Custom") })
+            }
+        }
         item {
             Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(30.dp), colors = CardDefaults.cardColors(containerColor = Navy)) {
                 Column(Modifier.padding(22.dp)) {
-                    Text("NET CASH FLOW · THIS MONTH", color = Color(0xFFD1E9DD), style = MaterialTheme.typography.labelMedium)
+                    Text("NET CASH FLOW · ${periodLabel.uppercase(Locale.getDefault())}", color = Color(0xFFD1E9DD), style = MaterialTheme.typography.labelMedium)
                     Spacer(Modifier.height(8.dp))
                     Text(money(netFlow), color = Color.White, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(22.dp))
@@ -361,13 +440,13 @@ private fun Dashboard(modifier: Modifier, transactions: List<FinanceTransaction>
             Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFFE8F5F1))) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                     Text("MONTHLY INSIGHT", color = Forest, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
-                    Text(if (previousSpend > 0L) {
-                        if (spendingChange <= 0) "You're spending ${kotlin.math.abs(spendingChange)}% less than last month." else "Spending is up ${spendingChange}% compared with last month."
-                    } else "Your monthly spending trend will appear after another month of activity.", color = Ink, fontWeight = FontWeight.SemiBold)
+                    Text(if (previousPeriodExpense > 0L) {
+                        if (spendingChange <= 0) "You're spending ${kotlin.math.abs(spendingChange)}% less than the previous period." else "Spending is up ${spendingChange}% compared with the previous period."
+                    } else "A comparison will appear when the previous period has expenses.", color = Ink, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
-        val recurringItems = transactions.filter { it.isRecurring }.take(3)
+        val recurringItems = periodTransactions.filter { it.isRecurring }.take(3)
         if (recurringItems.isNotEmpty()) {
             item { Text("Recurring transactions", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
             items(recurringItems, key = { "recurring-${it.id}" }) { TransactionRow(it) }
@@ -375,7 +454,7 @@ private fun Dashboard(modifier: Modifier, transactions: List<FinanceTransaction>
         if (showSpending) item {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("Spending breakdown", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                Text(SimpleDateFormat("MMMM", Locale.getDefault()).format(Date()), color = Muted, style = MaterialTheme.typography.labelMedium)
+                Text(periodLabel, color = Muted, style = MaterialTheme.typography.labelMedium)
             }
         }
         if (showSpending && categories.isEmpty()) item { EmptyCard("Your spending chart will appear here", "Add expenses to see where your money goes.") }
@@ -390,8 +469,8 @@ private fun Dashboard(modifier: Modifier, transactions: List<FinanceTransaction>
             }
         }
         if (showRecent) item { Text("Recent activity", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
-        if (showRecent) items(transactions.take(4), key = { it.id }) { TransactionRow(it) }
-        if (showRecent && transactions.isEmpty()) item { EmptyCard("No transactions yet", "Tap + to add your first income or expense.") }
+        if (showRecent) items(periodTransactions.take(4), key = { it.id }) { TransactionRow(it) }
+        if (showRecent && periodTransactions.isEmpty()) item { EmptyCard("No transactions in this period", "Choose another date range or add a transaction.") }
     }
 }
 
