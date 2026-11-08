@@ -1,6 +1,7 @@
 package com.skyboys.personalfinance
 
 import android.widget.Toast
+import android.app.DatePickerDialog
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -31,6 +32,10 @@ import com.skyboys.personalfinance.reports.FinanceAnalytics
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import java.util.UUID
+import java.util.Calendar
+import java.util.Date
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 private val AccountTeal = Color(0xFF087F73)
 private val AccountBlue = Color(0xFF3158C9)
@@ -46,7 +51,7 @@ fun AccountManagementScreen(modifier: Modifier, accounts: List<FinanceAccount>, 
     var deleting by remember { mutableStateOf<FinanceAccount?>(null) }
     var transferring by remember { mutableStateOf(false) }
     val netWorth = remember(accounts, transactions) { FinanceAnalytics.netWorth(accounts, transactions) }
-    fun balanceOf(account: FinanceAccount): Long = account.openingBalancePaise + transactions.filter { it.accountId == account.id }.sumOf {
+    fun balanceOf(account: FinanceAccount): Long = account.openingBalancePaise + transactions.filter { it.accountId == account.id && it.dateMillis > account.balanceAsOfMillis }.sumOf {
         when (it.type) { "INCOME", "TRANSFER_IN" -> it.amountPaise; "EXPENSE", "TRANSFER_OUT" -> -it.amountPaise; else -> 0L }
     }
     val banks = accounts.filter { it.type != "CREDIT_CARD" }
@@ -142,11 +147,11 @@ fun AccountManagementScreen(modifier: Modifier, accounts: List<FinanceAccount>, 
     }
 
     if (adding || editing != null) {
-        AccountEditorDialog(editing, onDismiss = { adding = false; editing = null }) { name, institution, type, balance, include, limit, dueDay ->
+        AccountEditorDialog(editing, onDismiss = { adding = false; editing = null }) { name, institution, type, balance, include, limit, dueDay, balanceAsOfMillis ->
             scope.launch(Dispatchers.IO) {
                 try {
-                    if (editing == null) dao.insertAccount(FinanceAccount(name=name, institution=institution, type=type, openingBalancePaise=balance, isIncludedInNetWorth=include, creditLimitPaise=limit, statementDueDay=dueDay))
-                    else editing!!.let { dao.updateAccount(it.id, name, institution, type, balance, it.currency, include, limit, dueDay) }
+                    if (editing == null) dao.insertAccount(FinanceAccount(name=name, institution=institution, type=type, openingBalancePaise=balance, isIncludedInNetWorth=include, creditLimitPaise=limit, statementDueDay=dueDay, balanceAsOfMillis=balanceAsOfMillis))
+                    else editing!!.let { dao.updateAccount(it.id, name, institution, type, balance, it.currency, include, limit, dueDay, balanceAsOfMillis) }
                 } catch (e: Exception) {
                     launch(Dispatchers.Main) { Toast.makeText(context, "Could not save account. Check for a duplicate name.", Toast.LENGTH_LONG).show() }
                 }
@@ -198,7 +203,7 @@ private fun AccountActions(onEdit: () -> Unit, onDelete: () -> Unit) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AccountEditorDialog(account: FinanceAccount?, onDismiss: () -> Unit, onSave: (String, String, String, Long, Boolean, Long, Int) -> Unit) {
+private fun AccountEditorDialog(account: FinanceAccount?, onDismiss: () -> Unit, onSave: (String, String, String, Long, Boolean, Long, Int, Long) -> Unit) {
     var name by remember(account?.id) { mutableStateOf(account?.name.orEmpty()) }
     var institution by remember(account?.id) { mutableStateOf(account?.institution.orEmpty()) }
     var type by remember(account?.id) { mutableStateOf(account?.type ?: "BANK") }
@@ -206,6 +211,7 @@ private fun AccountEditorDialog(account: FinanceAccount?, onDismiss: () -> Unit,
     var include by remember(account?.id) { mutableStateOf(account?.isIncludedInNetWorth ?: true) }
     var limit by remember(account?.id) { mutableStateOf(((account?.creditLimitPaise ?: 0L) / 100.0).toString()) }
     var dueDay by remember(account?.id) { mutableStateOf(if (account == null || account.statementDueDay == 0) "" else account.statementDueDay.toString()) }
+    var balanceAsOfMillis by remember(account?.id) { mutableLongStateOf(if (account == null) System.currentTimeMillis() else account.balanceAsOfMillis) }
     var typeExpanded by remember { mutableStateOf(false) }
     val parsed = balance.toBigDecimalOrNull()
     val parsedLimit = limit.toBigDecimalOrNull()
@@ -230,6 +236,21 @@ private fun AccountEditorDialog(account: FinanceAccount?, onDismiss: () -> Unit,
                 }
             }
             OutlinedTextField(balance,{balance=it},label={Text(if(type=="CREDIT_CARD") "Current outstanding amount (₹)" else "Current balance (₹)")},modifier=Modifier.fillMaxWidth(),keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal),singleLine=true)
+            OutlinedButton(onClick = {
+                val initial = Calendar.getInstance().apply { if (balanceAsOfMillis > 0L) timeInMillis = balanceAsOfMillis }
+                DatePickerDialog(
+                    context,
+                    { _, year, month, day ->
+                        balanceAsOfMillis = Calendar.getInstance().apply {
+                            set(year, month, day, 23, 59, 59)
+                            set(Calendar.MILLISECOND, 999)
+                        }.timeInMillis
+                    },
+                    initial.get(Calendar.YEAR), initial.get(Calendar.MONTH), initial.get(Calendar.DAY_OF_MONTH)
+                ).show()
+            }, modifier = Modifier.fillMaxWidth()) {
+                Text(if (balanceAsOfMillis > 0L) "Balance as of: ${SimpleDateFormat("dd MMM yyyy", Locale.getDefault()).format(Date(balanceAsOfMillis))}" else "Balance includes all recorded history")
+            }
             if (type == "CREDIT_CARD") {
                 OutlinedTextField(limit,{limit=it},label={Text("Credit limit (₹)")},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal),singleLine=true)
                 OutlinedTextField(dueDay,{dueDay=it.filter(Char::isDigit).take(2)},label={Text("Statement due day (1–31)")},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Number),singleLine=true)
@@ -240,7 +261,7 @@ private fun AccountEditorDialog(account: FinanceAccount?, onDismiss: () -> Unit,
             val enteredPaise = parsed!!.movePointRight(2).setScale(0, java.math.RoundingMode.HALF_UP).longValueExact()
             val paise = if (type == "CREDIT_CARD") -kotlin.math.abs(enteredPaise) else enteredPaise
             val limitPaise = if (type=="CREDIT_CARD") (parsedLimit ?: java.math.BigDecimal.ZERO).movePointRight(2).setScale(0, java.math.RoundingMode.HALF_UP).longValueExact() else 0L
-            onSave(name.trim(),institution.trim(),type,paise,include,limitPaise,dueDay.toIntOrNull() ?: 0)
+            onSave(name.trim(),institution.trim(),type,paise,include,limitPaise,dueDay.toIntOrNull() ?: 0,balanceAsOfMillis)
         }) { Text("Save") } },
         dismissButton={ TextButton(onClick=onDismiss){Text("Cancel")} })
 }
