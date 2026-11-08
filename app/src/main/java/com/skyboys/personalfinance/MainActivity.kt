@@ -14,6 +14,8 @@ import android.app.Activity
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -622,71 +624,133 @@ private fun EmptyCard(title: String, subtitle: String) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AddTransactionDialog(accounts: List<FinanceAccount>, onDismiss: () -> Unit, onSave: (String, Double, String, String, Long?, String, String, Boolean, String) -> Unit) {
+private fun AddTransactionDialog(
+    accounts: List<FinanceAccount>,
+    onDismiss: () -> Unit,
+    onSave: (String, Double, String, String, Long?, String, String, Boolean, String) -> Unit
+) {
     var title by remember { mutableStateOf("") }
     var amount by remember { mutableStateOf("") }
     var type by remember { mutableStateOf("EXPENSE") }
     var category by remember { mutableStateOf("Food") }
-    var accountId by remember { mutableStateOf<Long?>(accounts.firstOrNull()?.id) }
     var method by remember { mutableStateOf("UPI") }
+    var accountId by remember { mutableStateOf(accounts.firstOrNull { it.type == "BANK" }?.id ?: accounts.firstOrNull()?.id) }
     var tags by remember { mutableStateOf("") }
     var recurring by remember { mutableStateOf(false) }
     var frequency by remember { mutableStateOf("MONTHLY") }
+    var categoryExpanded by remember { mutableStateOf(false) }
+    var methodExpanded by remember { mutableStateOf(false) }
     var accountExpanded by remember { mutableStateOf(false) }
+    var moreOptions by remember { mutableStateOf(false) }
     val categories = listOf("Food", "Travel", "Bills", "Shopping", "Health", "Salary", "Business", "Other")
     val methods = listOf("UPI", "CASH", "CARD", "BANK_TRANSFER", "WALLET")
-    val validAmount = amount.toDoubleOrNull()?.let { it > 0 && it.isFinite() } == true
+    val eligibleAccounts = when (method) {
+        "CASH" -> accounts.filter { it.type == "CASH" }
+        "CARD" -> accounts.filter { it.type == "CREDIT_CARD" }
+        "BANK_TRANSFER" -> accounts.filter { it.type == "BANK" }
+        "WALLET" -> accounts.filter { it.type == "WALLET" }
+        else -> accounts.filter { it.type == "BANK" || it.type == "WALLET" }
+    }
+    if (accountId != null && eligibleAccounts.none { it.id == accountId }) accountId = eligibleAccounts.firstOrNull()?.id
+    val validAmount = amount.toBigDecimalOrNull()?.let { it.signum() > 0 && it.toDouble().isFinite() } == true
+    fun methodLabel(value: String) = when (value) {
+        "BANK_TRANSFER" -> "Bank transfer"
+        "CARD" -> "Card"
+        else -> value.lowercase().replaceFirstChar { it.uppercase() }
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("New transaction", fontWeight = FontWeight.Bold) },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(title, { title = it }, label = { Text("Description") }, singleLine = true)
-                OutlinedTextField(amount, { amount = it }, label = { Text("Amount (₹)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), singleLine = true)
+            Column(
+                Modifier.fillMaxWidth().heightIn(max = 440.dp).verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                OutlinedTextField(title, { title = it }, label = { Text("Description") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                OutlinedTextField(amount, { amount = it }, label = { Text("Amount (₹)") }, modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), singleLine = true)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     FilterChip(type == "EXPENSE", { type = "EXPENSE" }, label = { Text("Expense") })
                     FilterChip(type == "INCOME", { type = "INCOME" }, label = { Text("Income") })
                 }
-                Text("Category", style = MaterialTheme.typography.labelMedium)
-                Column {
-                    categories.chunked(4).forEach { row ->
-                        Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                            row.forEach { item -> FilterChip(category == item, { category = item }, label = { Text(item, style = MaterialTheme.typography.labelSmall) }) }
+                ExposedDropdownMenuBox(categoryExpanded, { categoryExpanded = it }) {
+                    OutlinedTextField(
+                        value = category, onValueChange = {}, readOnly = true,
+                        label = { Text("Category") }, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(categoryExpanded) },
+                        modifier = Modifier.menuAnchor().fillMaxWidth()
+                    )
+                    ExposedDropdownMenu(categoryExpanded, { categoryExpanded = false }) {
+                        categories.forEach { item ->
+                            DropdownMenuItem(text = { Text(item) }, onClick = { category = item; categoryExpanded = false })
                         }
                     }
                 }
-                Text("Payment method", style = MaterialTheme.typography.labelMedium)
-                methods.chunked(3).forEach { row ->
-                    Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                        row.forEach { item -> FilterChip(method == item, { method = item }, label = { Text(item, style = MaterialTheme.typography.labelSmall) }) }
+                ExposedDropdownMenuBox(methodExpanded, { methodExpanded = it }) {
+                    OutlinedTextField(
+                        value = methodLabel(method), onValueChange = {}, readOnly = true,
+                        label = { Text("Payment method") }, trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(methodExpanded) },
+                        modifier = Modifier.menuAnchor().fillMaxWidth()
+                    )
+                    ExposedDropdownMenu(methodExpanded, { methodExpanded = false }) {
+                        methods.forEach { item ->
+                            DropdownMenuItem(text = { Text(methodLabel(item)) }, onClick = {
+                                method = item
+                                val preferred = when (item) {
+                                    "CASH" -> accounts.firstOrNull { it.type == "CASH" }
+                                    "CARD" -> accounts.firstOrNull { it.type == "CREDIT_CARD" }
+                                    "BANK_TRANSFER" -> accounts.firstOrNull { it.type == "BANK" }
+                                    "WALLET" -> accounts.firstOrNull { it.type == "WALLET" }
+                                    else -> accounts.firstOrNull { it.type == "BANK" } ?: accounts.firstOrNull { it.type == "WALLET" }
+                                }
+                                accountId = preferred?.id
+                                methodExpanded = false
+                            })
+                        }
                     }
                 }
-                if (accounts.isNotEmpty()) {
+                if (eligibleAccounts.isNotEmpty()) {
                     ExposedDropdownMenuBox(accountExpanded, { accountExpanded = it }) {
                         OutlinedTextField(
-                            value = accounts.firstOrNull { it.id == accountId }?.name ?: "Select account",
+                            value = eligibleAccounts.firstOrNull { it.id == accountId }?.name ?: "Select account",
                             onValueChange = {}, readOnly = true, label = { Text("Account") },
                             trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(accountExpanded) },
                             modifier = Modifier.menuAnchor().fillMaxWidth()
                         )
                         ExposedDropdownMenu(accountExpanded, { accountExpanded = false }) {
-                            accounts.forEach { a -> DropdownMenuItem(text = { Text(a.name) }, onClick = { accountId = a.id; accountExpanded = false }) }
+                            eligibleAccounts.forEach { account ->
+                                DropdownMenuItem(text = { Text(account.name) }, onClick = { accountId = account.id; accountExpanded = false })
+                            }
                         }
                     }
+                } else {
+                    Text(
+                        "No matching account is available for this payment method. Add a matching account on the Accounts tab, or save this transaction without an account.",
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
                 }
-                OutlinedTextField(tags, { tags = it }, label = { Text("Tags (comma separated)") }, singleLine = true)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Checkbox(checked = recurring, onCheckedChange = { recurring = it })
-                    Text("Track as recurring")
+                TextButton(onClick = { moreOptions = !moreOptions }, contentPadding = PaddingValues(0.dp)) {
+                    Text(if (moreOptions) "Hide more options" else "More options")
                 }
-                if (recurring) Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf("WEEKLY", "MONTHLY", "YEARLY").forEach { item ->
-                        FilterChip(selected = frequency == item, onClick = { frequency = item }, label = { Text(item.lowercase().replaceFirstChar { it.uppercase() }) })
+                if (moreOptions) {
+                    OutlinedTextField(tags, { tags = it }, label = { Text("Tags (comma separated)") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = recurring, onCheckedChange = { recurring = it })
+                        Text("Track as recurring")
+                    }
+                    if (recurring) Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf("WEEKLY", "MONTHLY", "YEARLY").forEach { item ->
+                            FilterChip(selected = frequency == item, onClick = { frequency = item }, label = { Text(item.lowercase().replaceFirstChar { it.uppercase() }) })
+                        }
                     }
                 }
             }
         },
-        confirmButton = { TextButton(enabled = title.isNotBlank() && validAmount, onClick = { onSave(title.trim(), amount.toDouble(), type, category, accountId, method, tags, recurring, frequency) }) { Text("Save") } },
+        confirmButton = {
+            TextButton(enabled = title.isNotBlank() && validAmount, onClick = {
+                onSave(title.trim(), amount.toDouble(), type, category, accountId, method, tags, recurring, frequency)
+            }) { Text("Save") }
+        },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     )
 }
