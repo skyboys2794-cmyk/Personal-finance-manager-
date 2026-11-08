@@ -25,7 +25,7 @@ class GoogleSheetsBackupClient(
     ): BackupResult {
         require(accessToken.isNotBlank()) { "Google authorization is required" }
         val media = "application/json; charset=utf-8".toMediaType()
-        val tabNames = listOf("Transactions", "Accounts", "Budgets", "BillReminders", "Metadata")
+        val tabNames = listOf("Transactions", "Accounts", "Budgets", "BillReminders", "MerchantRules", "Metadata")
         val createBody = JSONObject()
             .put("properties", JSONObject().put("title", title))
             .put("sheets", JSONArray().apply {
@@ -65,6 +65,9 @@ class GoogleSheetsBackupClient(
         val reminderRows = data.reminders.sortedBy { it.id }.map { r ->
             listOf(r.id, r.title, r.amountPaise, r.dueDay, r.category, r.accountId ?: "", r.enabled)
         }
+        val merchantRuleRows = data.merchantRules.sortedBy { it.normalizedMerchant }.map { rule ->
+            listOf(rule.normalizedMerchant, rule.displayName, rule.category, rule.correctionCount, rule.updatedAtMillis)
+        }
         val metadataRows = listOf(
             listOf("format", "personal-finance-sheets-backup"),
             listOf("version", "1"),
@@ -72,7 +75,8 @@ class GoogleSheetsBackupClient(
             listOf("transactionCount", data.transactions.size.toString()),
             listOf("accountCount", data.accounts.size.toString()),
             listOf("budgetCount", data.budgets.size.toString()),
-            listOf("reminderCount", data.reminders.size.toString())
+            listOf("reminderCount", data.reminders.size.toString()),
+            listOf("merchantRuleCount", data.merchantRules.size.toString())
         )
         val ranges = JSONArray()
             .put(JSONObject().put("range", "Transactions!A1")
@@ -95,6 +99,9 @@ class GoogleSheetsBackupClient(
             .put(JSONObject().put("range", "BillReminders!A1")
                 .put("majorDimension", "ROWS")
                 .put("values", rows(listOf("id", "title", "amountPaise", "dueDay", "category", "accountId", "enabled"), reminderRows)))
+            .put(JSONObject().put("range", "MerchantRules!A1")
+                .put("majorDimension", "ROWS")
+                .put("values", rows(listOf("normalizedMerchant", "displayName", "category", "correctionCount", "updatedAtMillis"), merchantRuleRows)))
             .put(JSONObject().put("range", "Metadata!A1")
                 .put("majorDimension", "ROWS")
                 .put("values", JSONArray().apply { metadataRows.forEach { put(JSONArray(it)) } }))
