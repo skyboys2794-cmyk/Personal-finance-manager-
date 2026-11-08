@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material.icons.filled.CalendarMonth
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -59,11 +60,13 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-private val Forest = Color(0xFF176B55)
-private val Ink = Color(0xFF172B25)
-private val Muted = Color(0xFF708078)
-private val Mint = Color(0xFFE7F3ED)
-private val Coral = Color(0xFFD96B58)
+private val Forest = Color(0xFF087F73)
+private val Ink = Color(0xFF18243A)
+private val Muted = Color(0xFF7A8798)
+private val Mint = Color(0xFFE8F5F1)
+private val Coral = Color(0xFFE77769)
+private val Canvas = Color(0xFFF4F7FC)
+private val Navy = Color(0xFF172D55)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -186,21 +189,14 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
     }
 
     Scaffold(
-        containerColor = Color(0xFFF6F8F6),
+        containerColor = Canvas,
         topBar = {
             TopAppBar(
                 title = {
                     Column {
                         Text("Good day", style = MaterialTheme.typography.labelMedium, color = Muted)
-                        Text("Your finances", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Text("Finance Assistant", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     }
-                },
-                actions = {
-                    TextButton(onClick = { reportsDialog = true }) { Text("Reports") }
-                    TextButton(onClick = { csvPicker.launch(arrayOf("text/*", "application/vnd.ms-excel")) }) { Text("Import CSV") }
-                    TextButton(onClick = { backupMode = "export"; backupDialog = true }) { Text("Backup") }
-                    TextButton(onClick = { beginSheetsSync() }) { Text("Sheets") }
-                    TextButton(onClick = { customizeDashboard = true }) { Text("Customize") }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFF6F8F6))
             )
@@ -211,6 +207,7 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
                 NavigationBarItem(selected = tab == 1, onClick = { tab = 1 }, icon = { Icon(Icons.Default.ReceiptLong, null) }, label = { Text("Activity") })
                 NavigationBarItem(selected = tab == 2, onClick = { tab = 2 }, icon = { Icon(Icons.Default.Savings, null) }, label = { Text("Accounts") })
                 NavigationBarItem(selected = tab == 3, onClick = { tab = 3 }, icon = { Icon(Icons.Default.CalendarMonth, null) }, label = { Text("Plans") })
+                NavigationBarItem(selected = tab == 4, onClick = { tab = 4 }, icon = { Icon(Icons.Default.Settings, null) }, label = { Text("Settings") })
             }
         },
         floatingActionButton = {
@@ -220,17 +217,26 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
         }
     ) { padding ->
         when (tab) {
-            0 -> Dashboard(Modifier.padding(padding), transactions, summary.incomePaise, summary.expensePaise, summary.netCashFlowPaise, summary.expenseByCategory, showSpending, showRecent)
+            0 -> Dashboard(Modifier.padding(padding), transactions, accounts, summary.incomePaise, summary.expensePaise, summary.netCashFlowPaise, summary.expenseByCategory, showSpending, showRecent)
             1 -> ActivityList(Modifier.padding(padding), transactions) { id -> scope.launch(Dispatchers.IO) { dao.delete(id) } }
             2 -> AccountManagementScreen(Modifier.padding(padding), accounts, dao)
-            else -> ManagementScreen(dao)
+            3 -> ManagementScreen(dao)
+            else -> FinanceSettingsScreen(
+                onReports = { reportsDialog = true },
+                onImportCsv = { csvPicker.launch(arrayOf("text/*", "application/vnd.ms-excel")) },
+                onBackup = { backupMode = "export"; backupDialog = true },
+                onRestore = { backupMode = "restore"; backupDialog = true },
+                onSheets = { beginSheetsSync() },
+                onCustomize = { customizeDashboard = true }
+            )
         }
     }
 
-    if (showAdd) AddTransactionDialog(accounts, { showAdd = false }) { title, amount, type, category, accountId, method, tags ->
+    if (showAdd) AddTransactionDialog(accounts, { showAdd = false }) { title, amount, type, category, accountId, method, tags, recurring, frequency ->
         scope.launch(Dispatchers.IO) {
             val transaction = FinanceTransaction(title = title, amountPaise = (amount * 100).toLong(), type = type,
-                category = category, accountId = accountId, paymentMethod = method, tags = tags)
+                category = category, accountId = accountId, paymentMethod = method, tags = tags,
+                isRecurring = recurring, recurrenceFrequency = frequency)
             dao.insert(transaction)
             BudgetAlertEvaluator.evaluate(context, transaction)
         }
@@ -303,10 +309,20 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
 }
 
 @Composable
-private fun Dashboard(modifier: Modifier, transactions: List<FinanceTransaction>, income: Long, expenses: Long, netFlow: Long, categories: Map<String, Long>, showSpending: Boolean, showRecent: Boolean) {
+private fun Dashboard(modifier: Modifier, transactions: List<FinanceTransaction>, accounts: List<FinanceAccount>, income: Long, expenses: Long, netFlow: Long, categories: Map<String, Long>, showSpending: Boolean, showRecent: Boolean) {
+    val bankAccounts = accounts.filter { it.type != "CREDIT_CARD" }
+    val creditCards = accounts.filter { it.type == "CREDIT_CARD" }
+    fun balanceOf(account: FinanceAccount): Long = account.openingBalancePaise + transactions.filter { it.accountId == account.id }.sumOf {
+        when (it.type) { "INCOME", "TRANSFER_IN" -> it.amountPaise; "EXPENSE", "TRANSFER_OUT" -> -it.amountPaise; else -> 0L }
+    }
+    val cashAndBank = bankAccounts.sumOf { balanceOf(it) }
+    val cardUsed = creditCards.sumOf { (-balanceOf(it)).coerceAtLeast(0L) }
+    val trend = remember(transactions) { FinanceAnalytics.monthlyTrend(transactions, 2) }
+    val previousSpend = trend.firstOrNull()?.expensePaise ?: 0L
+    val spendingChange = if (previousSpend > 0L) ((expenses - previousSpend).toDouble() / previousSpend.toDouble() * 100.0).toInt() else 0
     LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 96.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item {
-            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(26.dp), colors = CardDefaults.cardColors(containerColor = Forest)) {
+            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(30.dp), colors = CardDefaults.cardColors(containerColor = Navy)) {
                 Column(Modifier.padding(22.dp)) {
                     Text("NET CASH FLOW · THIS MONTH", color = Color(0xFFD1E9DD), style = MaterialTheme.typography.labelMedium)
                     Spacer(Modifier.height(8.dp))
@@ -318,6 +334,37 @@ private fun Dashboard(modifier: Modifier, transactions: List<FinanceTransaction>
                     }
                 }
             }
+        }
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Card(Modifier.weight(1f), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
+                    Column(Modifier.padding(14.dp)) {
+                        Text("BANK + CASH", color = Muted, style = MaterialTheme.typography.labelSmall)
+                        Text(money(cashAndBank), color = Ink, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                    }
+                }
+                Card(Modifier.weight(1f), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFFEAF0FF))) {
+                    Column(Modifier.padding(14.dp)) {
+                        Text("CARD USED", color = Color(0xFF53699D), style = MaterialTheme.typography.labelSmall)
+                        Text(money(cardUsed), color = Navy, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                    }
+                }
+            }
+        }
+        item {
+            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp), colors = CardDefaults.cardColors(containerColor = Color(0xFFE8F5F1))) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text("MONTHLY INSIGHT", color = Forest, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                    Text(if (previousSpend > 0L) {
+                        if (spendingChange <= 0) "You're spending ${kotlin.math.abs(spendingChange)}% less than last month." else "Spending is up ${spendingChange}% compared with last month."
+                    } else "Your monthly spending trend will appear after another month of activity.", color = Ink, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+        val recurringItems = transactions.filter { it.isRecurring }.take(3)
+        if (recurringItems.isNotEmpty()) {
+            item { Text("Recurring transactions", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
+            items(recurringItems, key = { "recurring-${it.id}" }) { TransactionRow(it) }
         }
         if (showSpending) item {
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -389,6 +436,7 @@ private fun TransactionRow(transaction: FinanceTransaction, onDelete: (() -> Uni
                 Text(transaction.title, fontWeight = FontWeight.SemiBold, color = Ink)
                 Text("${transaction.category} · ${dateLabel(transaction.dateMillis)} · ${transaction.paymentMethod}", color = Muted, style = MaterialTheme.typography.bodySmall)
                 if (transaction.tags.isNotBlank()) Text(transaction.tags, color = Forest, style = MaterialTheme.typography.labelSmall)
+                if (transaction.isRecurring) Text("↻ ${transaction.recurrenceFrequency.lowercase().replaceFirstChar { it.uppercase() }} recurring", color = Forest, style = MaterialTheme.typography.labelSmall)
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text((if (transaction.type == "INCOME") "+" else "−") + money(transaction.amountPaise), color = if (transaction.type == "INCOME") Forest else Coral, fontWeight = FontWeight.Bold)
@@ -489,7 +537,7 @@ private fun EmptyCard(title: String, subtitle: String) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AddTransactionDialog(accounts: List<FinanceAccount>, onDismiss: () -> Unit, onSave: (String, Double, String, String, Long?, String, String) -> Unit) {
+private fun AddTransactionDialog(accounts: List<FinanceAccount>, onDismiss: () -> Unit, onSave: (String, Double, String, String, Long?, String, String, Boolean, String) -> Unit) {
     var title by remember { mutableStateOf("") }
     var amount by remember { mutableStateOf("") }
     var type by remember { mutableStateOf("EXPENSE") }
@@ -497,6 +545,8 @@ private fun AddTransactionDialog(accounts: List<FinanceAccount>, onDismiss: () -
     var accountId by remember { mutableStateOf<Long?>(accounts.firstOrNull()?.id) }
     var method by remember { mutableStateOf("UPI") }
     var tags by remember { mutableStateOf("") }
+    var recurring by remember { mutableStateOf(false) }
+    var frequency by remember { mutableStateOf("MONTHLY") }
     var accountExpanded by remember { mutableStateOf(false) }
     val categories = listOf("Food", "Travel", "Bills", "Shopping", "Health", "Salary", "Business", "Other")
     val methods = listOf("UPI", "CASH", "CARD", "BANK_TRANSFER", "WALLET")
@@ -540,9 +590,18 @@ private fun AddTransactionDialog(accounts: List<FinanceAccount>, onDismiss: () -
                     }
                 }
                 OutlinedTextField(tags, { tags = it }, label = { Text("Tags (comma separated)") }, singleLine = true)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(checked = recurring, onCheckedChange = { recurring = it })
+                    Text("Track as recurring")
+                }
+                if (recurring) Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf("WEEKLY", "MONTHLY", "YEARLY").forEach { item ->
+                        FilterChip(selected = frequency == item, onClick = { frequency = item }, label = { Text(item.lowercase().replaceFirstChar { it.uppercase() }) })
+                    }
+                }
             }
         },
-        confirmButton = { TextButton(enabled = title.isNotBlank() && validAmount, onClick = { onSave(title.trim(), amount.toDouble(), type, category, accountId, method, tags) }) { Text("Save") } },
+        confirmButton = { TextButton(enabled = title.isNotBlank() && validAmount, onClick = { onSave(title.trim(), amount.toDouble(), type, category, accountId, method, tags, recurring, frequency) }) { Text("Save") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     )
 }
