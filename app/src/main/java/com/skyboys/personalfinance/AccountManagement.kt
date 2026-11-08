@@ -56,8 +56,8 @@ fun AccountManagementScreen(modifier: Modifier, accounts: List<FinanceAccount>, 
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("Your accounts", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
-                    Text("Banks, cash and credit cards in one place", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
+                    Text(if (accounts.isEmpty()) "Set up your finances" else "Your accounts", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                    Text(if (accounts.isEmpty()) "Add each bank account, wallet and credit card with its current balance and limits. This information stays on your device." else "Banks, cash and credit cards in one place", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
                 }
                 Button(onClick = { adding = true }, shape = RoundedCornerShape(16.dp)) { Text("Add account") }
             }
@@ -118,7 +118,7 @@ fun AccountManagementScreen(modifier: Modifier, accounts: List<FinanceAccount>, 
                         Text("CREDIT", color = Color(0xFFB9CCFF), style = MaterialTheme.typography.labelSmall)
                     }
                     Text(money(used), color = Color.White, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-                    Text("Amount used", color = Color(0xFFB9CCFF), style = MaterialTheme.typography.labelMedium)
+                    Text("Outstanding amount", color = Color(0xFFB9CCFF), style = MaterialTheme.typography.labelMedium)
                     LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth().height(8.dp), color = Color(0xFF75E0BD), trackColor = Color(0xFF40568C))
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         Column {
