@@ -67,8 +67,10 @@ object SmartTransactionEngine {
     }
 
     fun canonicalType(type: String): String = when (type.uppercase(Locale.ROOT)) {
-        "DEBIT", "EXPENSE", "TRANSFER_OUT" -> type.uppercase(Locale.ROOT)
-        "CREDIT", "INCOME", "TRANSFER_IN" -> type.uppercase(Locale.ROOT)
+        "DEBIT", "EXPENSE" -> "EXPENSE"
+        "CREDIT", "INCOME" -> "INCOME"
+        "TRANSFER_OUT" -> "TRANSFER_OUT"
+        "TRANSFER_IN" -> "TRANSFER_IN"
         else -> type.uppercase(Locale.ROOT)
     }
 
