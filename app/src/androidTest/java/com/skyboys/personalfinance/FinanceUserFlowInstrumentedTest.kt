@@ -3,6 +3,7 @@ package com.skyboys.personalfinance
 import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onAllNodes
+import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -32,7 +33,7 @@ class FinanceUserFlowInstrumentedTest {
 
         composeRule.onNodeWithText("Activity").performClick()
         composeRule.waitUntil(timeoutMillis = 10_000) {
-            composeRule.onNodeWithText(description).fetchSemanticsNodeOrNull() != null
+            composeRule.onAllNodesWithText(description).fetchSemanticsNodes().isNotEmpty()
         }
         composeRule.onNodeWithText(description).assertExists()
     }
