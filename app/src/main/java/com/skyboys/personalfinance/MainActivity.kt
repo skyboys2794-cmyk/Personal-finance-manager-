@@ -8,6 +8,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.result.IntentSenderRequest
+import android.app.Activity
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -36,6 +38,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
 import com.skyboys.personalfinance.backup.EncryptedBackup
+import com.skyboys.personalfinance.backup.GoogleSheetsBackupClient
+import com.google.android.gms.auth.api.identity.AuthorizationRequest
+import com.google.android.gms.auth.api.identity.Identity
+import com.google.android.gms.common.api.Scope
 import com.skyboys.personalfinance.data.FinanceAccount
 import com.skyboys.personalfinance.data.FinanceDatabase
 import com.skyboys.personalfinance.data.FinanceTransaction
@@ -112,7 +118,7 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
             }
         }
     }
-    val backupExporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
+    fun uploadSheets(token: String) {\n        scope.launch(Dispatchers.IO) {\n            try {\n                val result = GoogleSheetsBackupClient().createBackup(token, dao.allTransactions())\n                withContext(Dispatchers.Main) { Toast.makeText(context, "Google Sheets backup created: " + result.spreadsheetUrl, Toast.LENGTH_LONG).show() }\n            } catch (e: Exception) {\n                withContext(Dispatchers.Main) { Toast.makeText(context, "Google Sheets backup failed: " + e.message, Toast.LENGTH_LONG).show() }\n            }\n        }\n    }\n    val sheetsAuthorizationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->\n        if (result.resultCode == Activity.RESULT_OK) {\n            runCatching { Identity.getAuthorizationClient(context).getAuthorizationResultFromIntent(result.data).accessToken }\n                .onSuccess { token -> if (!token.isNullOrBlank()) uploadSheets(token) }\n                .onFailure { Toast.makeText(context, "Google authorization failed: " + it.message, Toast.LENGTH_LONG).show() }\n        }\n    }\n    fun beginSheetsSync() {\n        val request = AuthorizationRequest.builder()\n            .setRequestedScopes(listOf(Scope("https://www.googleapis.com/auth/spreadsheets")))\n            .build()\n        Identity.getAuthorizationClient(context).authorize(request)\n            .addOnSuccessListener { result ->\n                if (result.hasResolution()) {\n                    val pending = result.pendingIntent\n                    if (pending != null) sheetsAuthorizationLauncher.launch(IntentSenderRequest.Builder(pending.intentSender).build())\n                } else {\n                    val token = result.accessToken\n                    if (!token.isNullOrBlank()) uploadSheets(token)\n                }\n            }\n            .addOnFailureListener { Toast.makeText(context, "Google authorization failed: " + it.message, Toast.LENGTH_LONG).show() }\n    }\n\n    val backupExporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
         if (uri != null) scope.launch {
             try {
                 val bytes = withContext(Dispatchers.IO) { EncryptedBackup.export(dao.allTransactions(), backupPassword.toCharArray()) }
@@ -146,7 +152,7 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
                 },
                 actions = {
                     TextButton(onClick = { csvPicker.launch(arrayOf("text/*", "application/vnd.ms-excel")) }) { Text("Import CSV") }
-                    TextButton(onClick = { backupMode = "export"; backupDialog = true }) { Text("Backup") }
+                    TextButton(onClick = { backupMode = "export"; backupDialog = true }) { Text("Backup") }\n                    TextButton(onClick = { beginSheetsSync() }) { Text("Sheets") }
                     TextButton(onClick = { customizeDashboard = true }) { Text("Customize") }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFF6F8F6))
