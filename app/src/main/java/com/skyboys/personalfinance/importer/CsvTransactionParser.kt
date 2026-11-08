@@ -10,7 +10,7 @@ import java.util.Locale
  * Quoted cells and escaped quotes follow RFC 4180.
  */
 object CsvTransactionParser {
-    data class Result(val transactions: List<FinanceTransaction>, val errors: List<String>)
+    data class Result(val transactions: List<FinanceTransaction>, val errors: List<String>, val accountNames: List<String?> = emptyList())
 
     fun parse(csv: String): Result {
         val rows = parseRows(csv)
@@ -28,6 +28,7 @@ object CsvTransactionParser {
         val methodCol = index("payment_method", "method")
         val tagsCol = index("tags", "tag")
         val out = mutableListOf<FinanceTransaction>()
+        val accountNames = mutableListOf<String?>()
         val errors = mutableListOf<String>()
         rows.drop(1).forEachIndexed { rowIndex, row ->
             if (row.all { it.isBlank() }) return@forEachIndexed
@@ -59,8 +60,9 @@ object CsvTransactionParser {
                 paymentMethod = cell(methodCol).ifBlank { "BANK_TRANSFER" },
                 tags = cell(tagsCol)
             )
+            accountNames += cell(accountCol).ifBlank { null }
         }
-        return Result(out, errors)
+        return Result(out, errors, accountNames)
     }
 
     private fun parseRows(input: String): List<List<String>> {
