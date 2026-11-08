@@ -27,7 +27,7 @@ class AccountTransferInstrumentedTest {
             FinanceTransaction(title="Transfer in", amountPaise=1500, type="TRANSFER_IN", category="Transfers", accountId=toId, transferId=transferId)
         )
         dao.saveReminder(BillReminder(title="Test bill $suffix", amountPaise=1000, dueDay=10, accountId=fromId))
-        dao.updateAccount(fromId, "Edited source $suffix", "Test bank", "BANK", 5000, "INR", true)
+        dao.updateAccount(fromId, "Edited source $suffix", "Test bank", "BANK", 5000, "INR", true, 0L, 0)
         assertEquals("Edited source $suffix", dao.allAccounts().first { it.id == fromId }.name)
         assertEquals(2, dao.allTransactions().count { it.transferId == transferId })
 
