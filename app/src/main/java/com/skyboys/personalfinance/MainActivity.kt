@@ -65,7 +65,7 @@ private val Ink = Color(0xFF18243A)
 private val Muted = Color(0xFF7A8798)
 private val Mint = Color(0xFFE8F5F1)
 private val Coral = Color(0xFFE77769)
-private val Canvas = Color(0xFFF4F7FC)
+private val AppBackground = Color(0xFFF4F7FC)
 private val Navy = Color(0xFF172D55)
 
 class MainActivity : ComponentActivity() {
@@ -87,7 +87,7 @@ class MainActivity : ComponentActivity() {
             MaterialTheme(
                 colorScheme = lightColorScheme(
                     primary = Forest, onPrimary = Color.White, primaryContainer = Mint,
-                    secondary = Color(0xFFB7D8C8), background = Canvas,
+                    secondary = Color(0xFFB7D8C8), background = AppBackground,
                     surface = Color.White, onSurface = Ink, error = Coral
                 )
             ) { FinanceApp(dao) }
@@ -192,7 +192,7 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
     }
 
     Scaffold(
-        containerColor = Canvas,
+        containerColor = AppBackground,
         topBar = {
             TopAppBar(
                 title = {
