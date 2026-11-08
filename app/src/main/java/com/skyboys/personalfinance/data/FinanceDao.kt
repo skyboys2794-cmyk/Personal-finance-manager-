@@ -79,6 +79,15 @@ interface FinanceDao {
     @Query("SELECT * FROM transactions WHERE dateMillis >= :start AND dateMillis < :end")
     suspend fun transactionsBetween(start: Long, end: Long): List<FinanceTransaction>
 
+    @Query("SELECT * FROM merchant_category_rules WHERE normalizedMerchant=:normalizedMerchant LIMIT 1")
+    suspend fun merchantRule(normalizedMerchant: String): MerchantCategoryRule?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun saveMerchantRule(rule: MerchantCategoryRule)
+
+    @Query("SELECT * FROM merchant_category_rules ORDER BY updatedAtMillis DESC")
+    fun observeMerchantRules(): Flow<List<MerchantCategoryRule>>
+
     @Transaction
     suspend fun replaceAllData(transactions: List<FinanceTransaction>, accounts: List<FinanceAccount>, budgets: List<FinanceBudget>, reminders: List<BillReminder>) {
         clearTransactions()
