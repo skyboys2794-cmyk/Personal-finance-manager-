@@ -21,7 +21,14 @@ private val MIGRATION_1_2 = object : Migration(1, 2) {
     }
 }
 
-@Database(entities = [FinanceTransaction::class, FinanceAccount::class, FinanceBudget::class, BillReminder::class], version = 2, exportSchema = false)
+private val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE transactions ADD COLUMN transferId TEXT")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_transactions_transferId ON transactions(transferId)")
+    }
+}
+
+@Database(entities = [FinanceTransaction::class, FinanceAccount::class, FinanceBudget::class, BillReminder::class], version = 3, exportSchema = false)
 abstract class FinanceDatabase : RoomDatabase() {
     abstract fun financeDao(): FinanceDao
     companion object {
@@ -29,7 +36,7 @@ abstract class FinanceDatabase : RoomDatabase() {
         fun get(context: Context): FinanceDatabase =
             INSTANCE ?: synchronized(this) {
                 INSTANCE ?: Room.databaseBuilder(context.applicationContext, FinanceDatabase::class.java, "personal-finance.db")
-                    .addMigrations(MIGRATION_1_2).build().also { INSTANCE = it }
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3).build().also { INSTANCE = it }
             }
     }
 }
