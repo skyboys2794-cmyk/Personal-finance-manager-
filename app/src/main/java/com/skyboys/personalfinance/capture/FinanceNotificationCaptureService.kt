@@ -7,6 +7,7 @@ import android.service.notification.StatusBarNotification
 import com.skyboys.personalfinance.data.FinanceDatabase
 import com.skyboys.personalfinance.data.FinanceTransaction
 import com.skyboys.personalfinance.categorization.MerchantMemory
+import com.skyboys.personalfinance.intelligence.SmartTransactionEngine
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -53,9 +54,13 @@ class FinanceNotificationCaptureService : NotificationListenerService() {
                     resolvedCategory == "Other" -> "CATEGORY_REVIEW"
                     else -> "AUTO_CATEGORIZED"
                 }
+                val candidate = FinanceTransaction(
+                    title = parsed.title, amountPaise = parsed.amountPaise, type = parsed.type,
+                    category = resolvedCategory, dateMillis = transactionTime, accountId = accountId,
+                    paymentMethod = parsed.paymentMethod
+                )
                 val duplicate = dao.allTransactions().any { item ->
-                    item.amountPaise == parsed.amountPaise && item.type == parsed.type &&
-                        abs(item.dateMillis - transactionTime) <= 90_000L && item.tags.contains(TAG_CAPTURE)
+                    item.tags.contains(TAG_CAPTURE) && SmartTransactionEngine.isLikelyDuplicate(candidate, item, 90_000L)
                 }
                 if (!duplicate) {
                     dao.insert(FinanceTransaction(
