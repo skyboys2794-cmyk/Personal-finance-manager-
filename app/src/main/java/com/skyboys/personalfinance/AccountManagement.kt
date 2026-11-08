@@ -202,7 +202,7 @@ private fun AccountEditorDialog(account: FinanceAccount?, onDismiss: () -> Unit,
     var name by remember(account?.id) { mutableStateOf(account?.name.orEmpty()) }
     var institution by remember(account?.id) { mutableStateOf(account?.institution.orEmpty()) }
     var type by remember(account?.id) { mutableStateOf(account?.type ?: "BANK") }
-    var balance by remember(account?.id) { mutableStateOf(((account?.openingBalancePaise ?: 0L) / 100.0).toString()) }
+    var balance by remember(account?.id) { mutableStateOf((kotlin.math.abs(account?.openingBalancePaise ?: 0L) / 100.0).toString()) }
     var include by remember(account?.id) { mutableStateOf(account?.isIncludedInNetWorth ?: true) }
     var limit by remember(account?.id) { mutableStateOf(((account?.creditLimitPaise ?: 0L) / 100.0).toString()) }
     var dueDay by remember(account?.id) { mutableStateOf(if (account == null || account.statementDueDay == 0) "" else account.statementDueDay.toString()) }
@@ -229,7 +229,7 @@ private fun AccountEditorDialog(account: FinanceAccount?, onDismiss: () -> Unit,
                     }
                 }
             }
-            OutlinedTextField(balance,{balance=it},label={Text(if(type=="CREDIT_CARD") "Opening balance (₹; outstanding is negative)" else "Opening balance (₹)")},modifier=Modifier.fillMaxWidth(),keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal),singleLine=true)
+            OutlinedTextField(balance,{balance=it},label={Text(if(type=="CREDIT_CARD") "Current outstanding amount (₹)" else "Current balance (₹)")},modifier=Modifier.fillMaxWidth(),keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal),singleLine=true)
             if (type == "CREDIT_CARD") {
                 OutlinedTextField(limit,{limit=it},label={Text("Credit limit (₹)")},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Decimal),singleLine=true)
                 OutlinedTextField(dueDay,{dueDay=it.filter(Char::isDigit).take(2)},label={Text("Statement due day (1–31)")},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Number),singleLine=true)
@@ -237,7 +237,8 @@ private fun AccountEditorDialog(account: FinanceAccount?, onDismiss: () -> Unit,
             Row(verticalAlignment=Alignment.CenterVertically) { Checkbox(include,{include=it}); Text("Include in net worth") }
         } },
         confirmButton={ TextButton(enabled=name.isNotBlank() && parsed != null && (type!="CREDIT_CARD" || (parsedLimit != null && parsedLimit.signum()>=0 && (dueDay.isBlank() || dueDay.toIntOrNull()?.let { it in 1..31 }==true))), onClick={
-            val paise = parsed!!.movePointRight(2).setScale(0, java.math.RoundingMode.HALF_UP).longValueExact()
+            val enteredPaise = parsed!!.movePointRight(2).setScale(0, java.math.RoundingMode.HALF_UP).longValueExact()
+            val paise = if (type == "CREDIT_CARD") -kotlin.math.abs(enteredPaise) else enteredPaise
             val limitPaise = if (type=="CREDIT_CARD") (parsedLimit ?: java.math.BigDecimal.ZERO).movePointRight(2).setScale(0, java.math.RoundingMode.HALF_UP).longValueExact() else 0L
             onSave(name.trim(),institution.trim(),type,paise,include,limitPaise,dueDay.toIntOrNull() ?: 0)
         }) { Text("Save") } },
