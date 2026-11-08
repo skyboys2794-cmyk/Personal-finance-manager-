@@ -28,6 +28,18 @@ jobs:
         with:
           gradle-version: "8.9"
 
+      - name: Run JVM unit tests
+        run: gradle --no-daemon testDebugUnitTest
+
+      - name: Run Android emulator tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_2
+          script: gradle --no-daemon connectedDebugAndroidTest
+
       - name: Build debug APK
         run: gradle --no-daemon assembleDebug
 
