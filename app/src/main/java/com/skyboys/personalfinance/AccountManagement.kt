@@ -102,6 +102,8 @@ fun AccountManagementScreen(modifier: Modifier, accounts: List<FinanceAccount>, 
             text = { Text("Transactions and reminders will be kept, but detached from this account. This action cannot be undone.") },
             confirmButton = { TextButton(onClick = {
                 scope.launch(Dispatchers.IO) {
+                    val linkedTransfers = dao.transferIdsForAccount(account.id)
+                    if (linkedTransfers.isNotEmpty()) dao.deleteTransfers(linkedTransfers)
                     dao.detachTransactionsFromAccount(account.id)
                     dao.detachRemindersFromAccount(account.id)
                     dao.deleteAccount(account.id)
@@ -146,6 +148,7 @@ private fun AccountEditorDialog(account: FinanceAccount?, onDismiss: () -> Unit,
         dismissButton={ TextButton(onClick=onDismiss){Text("Cancel")} })
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun TransferDialog(accounts: List<FinanceAccount>, onDismiss: () -> Unit, onTransfer: (Long,Long,Long,String) -> Unit) {
     var from by remember { mutableStateOf(accounts.first().id) }
