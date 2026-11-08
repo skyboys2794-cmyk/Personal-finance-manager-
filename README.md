@@ -42,7 +42,7 @@ does not connect to bank accounts or request bank passwords.
 
 Complete finance backups are encrypted on-device before the user selects a file location. Use a strong password of at least 10 characters and keep it safe: there is no password recovery. Restore replaces the current local dataset with the backup contents. The Room database remains local app-private storage and is not itself encrypted at rest. Android cloud backup is disabled.
 
-Google Sheets is optional and requires explicit user authorization. The current in-app OAuth consent flow creates a transaction snapshot; it does not yet provide full two-way synchronization or account/card restoration. The owner must
+Google Sheets is optional and requires explicit user authorization. The current in-app OAuth consent flow creates a full-finance snapshot with transactions, accounts/cards, budgets, bill reminders and balance snapshot dates. Existing-sheet linking, import/restore and full two-way synchronization are not yet implemented. The owner must
 configure an app-specific OAuth client, enable the Sheets API, and register the
 Android package name plus signing-certificate SHA-1. Follow
 [Google Sheets setup](docs/GOOGLE_SHEETS_BACKUP.md). Never commit client
