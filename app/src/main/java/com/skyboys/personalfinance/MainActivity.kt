@@ -118,7 +118,41 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
             }
         }
     }
-    fun uploadSheets(token: String) {\n        scope.launch(Dispatchers.IO) {\n            try {\n                val result = GoogleSheetsBackupClient().createBackup(token, dao.allTransactions())\n                withContext(Dispatchers.Main) { Toast.makeText(context, "Google Sheets backup created: " + result.spreadsheetUrl, Toast.LENGTH_LONG).show() }\n            } catch (e: Exception) {\n                withContext(Dispatchers.Main) { Toast.makeText(context, "Google Sheets backup failed: " + e.message, Toast.LENGTH_LONG).show() }\n            }\n        }\n    }\n    val sheetsAuthorizationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->\n        if (result.resultCode == Activity.RESULT_OK) {\n            runCatching { Identity.getAuthorizationClient(context).getAuthorizationResultFromIntent(result.data).accessToken }\n                .onSuccess { token -> if (!token.isNullOrBlank()) uploadSheets(token) }\n                .onFailure { Toast.makeText(context, "Google authorization failed: " + it.message, Toast.LENGTH_LONG).show() }\n        }\n    }\n    fun beginSheetsSync() {\n        val request = AuthorizationRequest.builder()\n            .setRequestedScopes(listOf(Scope("https://www.googleapis.com/auth/spreadsheets")))\n            .build()\n        Identity.getAuthorizationClient(context).authorize(request)\n            .addOnSuccessListener { result ->\n                if (result.hasResolution()) {\n                    val pending = result.pendingIntent\n                    if (pending != null) sheetsAuthorizationLauncher.launch(IntentSenderRequest.Builder(pending.intentSender).build())\n                } else {\n                    val token = result.accessToken\n                    if (!token.isNullOrBlank()) uploadSheets(token)\n                }\n            }\n            .addOnFailureListener { Toast.makeText(context, "Google authorization failed: " + it.message, Toast.LENGTH_LONG).show() }\n    }\n\n    val backupExporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
+    fun uploadSheets(token: String) {
+        scope.launch(Dispatchers.IO) {
+            try {
+                val result = GoogleSheetsBackupClient().createBackup(token, dao.allTransactions())
+                withContext(Dispatchers.Main) { Toast.makeText(context, "Google Sheets backup created: " + result.spreadsheetUrl, Toast.LENGTH_LONG).show() }
+            } catch (e: Exception) {
+                withContext(Dispatchers.Main) { Toast.makeText(context, "Google Sheets backup failed: " + e.message, Toast.LENGTH_LONG).show() }
+            }
+        }
+    }
+    val sheetsAuthorizationLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            runCatching { Identity.getAuthorizationClient(context).getAuthorizationResultFromIntent(result.data).accessToken }
+                .onSuccess { token -> if (!token.isNullOrBlank()) uploadSheets(token) }
+                .onFailure { Toast.makeText(context, "Google authorization failed: " + it.message, Toast.LENGTH_LONG).show() }
+        }
+    }
+    fun beginSheetsSync() {
+        val request = AuthorizationRequest.builder()
+            .setRequestedScopes(listOf(Scope("https://www.googleapis.com/auth/spreadsheets")))
+            .build()
+        Identity.getAuthorizationClient(context).authorize(request)
+            .addOnSuccessListener { result ->
+                if (result.hasResolution()) {
+                    val pending = result.pendingIntent
+                    if (pending != null) sheetsAuthorizationLauncher.launch(IntentSenderRequest.Builder(pending.intentSender).build())
+                } else {
+                    val token = result.accessToken
+                    if (!token.isNullOrBlank()) uploadSheets(token)
+                }
+            }
+            .addOnFailureListener { Toast.makeText(context, "Google authorization failed: " + it.message, Toast.LENGTH_LONG).show() }
+    }
+
+    val backupExporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
         if (uri != null) scope.launch {
             try {
                 val bytes = withContext(Dispatchers.IO) { EncryptedBackup.export(dao.allTransactions(), backupPassword.toCharArray()) }
@@ -152,7 +186,8 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
                 },
                 actions = {
                     TextButton(onClick = { csvPicker.launch(arrayOf("text/*", "application/vnd.ms-excel")) }) { Text("Import CSV") }
-                    TextButton(onClick = { backupMode = "export"; backupDialog = true }) { Text("Backup") }\n                    TextButton(onClick = { beginSheetsSync() }) { Text("Sheets") }
+                    TextButton(onClick = { backupMode = "export"; backupDialog = true }) { Text("Backup") }
+                    TextButton(onClick = { beginSheetsSync() }) { Text("Sheets") }
                     TextButton(onClick = { customizeDashboard = true }) { Text("Customize") }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFF6F8F6))
