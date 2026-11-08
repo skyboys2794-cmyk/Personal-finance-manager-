@@ -102,11 +102,7 @@ fun AccountManagementScreen(modifier: Modifier, accounts: List<FinanceAccount>, 
             text = { Text("Transactions and reminders will be kept, but detached from this account. This action cannot be undone.") },
             confirmButton = { TextButton(onClick = {
                 scope.launch(Dispatchers.IO) {
-                    val linkedTransfers = dao.transferIdsForAccount(account.id)
-                    if (linkedTransfers.isNotEmpty()) dao.deleteTransfers(linkedTransfers)
-                    dao.detachTransactionsFromAccount(account.id)
-                    dao.detachRemindersFromAccount(account.id)
-                    dao.deleteAccount(account.id)
+                    dao.deleteAccountSafely(account.id)
                 }
                 deleting = null
             }) { Text("Delete account") } },
@@ -116,10 +112,10 @@ fun AccountManagementScreen(modifier: Modifier, accounts: List<FinanceAccount>, 
         scope.launch(Dispatchers.IO) {
             val transferId = UUID.randomUUID().toString()
             val time = System.currentTimeMillis()
-            dao.insertAll(listOf(
+            dao.insertTransferPair(
                 FinanceTransaction(title=note.ifBlank { "Transfer to ${accounts.first { it.id == to }.name}" }, amountPaise=amount, type="TRANSFER_OUT", category="Transfers", dateMillis=time, accountId=from, paymentMethod="BANK_TRANSFER", transferId=transferId),
                 FinanceTransaction(title=note.ifBlank { "Transfer from ${accounts.first { it.id == from }.name}" }, amountPaise=amount, type="TRANSFER_IN", category="Transfers", dateMillis=time, accountId=to, paymentMethod="BANK_TRANSFER", transferId=transferId)
-            ))
+            )
         }
         transferring = false
     }
