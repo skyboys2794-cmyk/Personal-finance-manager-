@@ -45,14 +45,24 @@ Each row needs a stable record identifier and last-modified timestamp. The sync 
 - Keep encrypted file backup available as an independent recovery route.
 - Automatic daily sync is opt-in, configurable, and uses WorkManager constraints (for example Wi-Fi/charging). The app remains fully usable offline.
 
+## Local intelligence implementation
+
+A local merchant-category memory table is now part of the Room schema. When a user saves or corrects a transaction category, the normalized merchant/category association is stored locally. Notification capture consults this memory before falling back to the built-in keyword rules. No merchant data is sent to a remote service.
+
+The current learning model is intentionally transparent and deterministic. It does not run a cloud model or silently rewrite old transactions.
+
 ## Implementation sequence
 
 1. First-launch account setup and removal of placeholder accounts.
-2. Versioned full-data spreadsheet export, including account and card information.
-3. Link/create spreadsheet and import preview/restore.
-4. Stable IDs, change tracking, deletion tracking, and conflict-safe two-way sync.
-5. Optional daily background backup and sync status.
-6. Unit, instrumentation, migration, duplicate-sync, partial-failure, and restore tests.
+2. Effective-date-aware balances and complete encrypted backup metadata.
+3. Full-data Google Sheets export with readable account/card, transaction, budget, bill and metadata tabs.
+4. Local merchant/category memory and notification categorization.
+5. Link an existing spreadsheet, update it in place, and preview import/restore.
+6. Stable record identities, change/deletion tracking, and conflict-safe two-way sync.
+7. Optional daily background backup and sync status.
+8. Shared transaction processing, improved duplicate detection, reconciliation and local insights.
+9. Database-at-rest encryption with a tested, recoverable migration path.
+10. Unit, instrumentation, migration, duplicate-sync, partial-failure, and restore tests.
 
 ## Balance semantics
 
