@@ -51,7 +51,8 @@ fun PdfStatementImportDialog(dao: FinanceDao, onDismiss: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val accounts by dao.observeAccounts().collectAsState(initial = emptyList())
-    var selectedAccountId by remember { mutableStateOf<Long?>(null) }\n    LaunchedEffect(accounts) { if (selectedAccountId == null) selectedAccountId = accounts.firstOrNull { it.type == "BANK" }?.id }
+    var selectedAccountId by remember { mutableStateOf<Long?>(null) }
+    LaunchedEffect(accounts) { if (selectedAccountId == null) selectedAccountId = accounts.firstOrNull { it.type == "BANK" }?.id }
     var accountMenu by remember { mutableStateOf(false) }
     var selectedUri by remember { mutableStateOf<android.net.Uri?>(null) }
     var password by remember { mutableStateOf("") }
@@ -72,7 +73,7 @@ fun PdfStatementImportDialog(dao: FinanceDao, onDismiss: () -> Unit) {
                     val result = withContext(Dispatchers.IO) { PdfStatementParser.read(context, uri) }
                     entries = result.entries
                     skippedLines = result.skippedLines
-                    preview = true
+                    preview = result.entries.isNotEmpty()
                     if (entries.isEmpty()) errorMessage = "No readable transaction rows were found. This PDF may be scanned or use an unsupported statement layout."
                 } catch (_: PdfPasswordRequiredException) {
                     passwordDialog = true
@@ -108,11 +109,15 @@ fun PdfStatementImportDialog(dao: FinanceDao, onDismiss: () -> Unit) {
                             val result = withContext(Dispatchers.IO) { PdfStatementParser.read(context, uri, password) }
                             entries = result.entries
                             skippedLines = result.skippedLines
-                            preview = true
+                            preview = result.entries.isNotEmpty()
                             if (entries.isEmpty()) errorMessage = "No readable transaction rows were found. Check the password and statement format."
                         } catch (e: Exception) {
-                            errorMessage = if (e is PdfPasswordRequiredException) "Incorrect PDF password. Please try again." else "Could not read this PDF: ${e.message ?: "unsupported or damaged file"}"
-                            passwordDialog = true
+                            if (e is PdfPasswordRequiredException) {
+                                Toast.makeText(context, "Incorrect PDF password. Please try again.", Toast.LENGTH_LONG).show()
+                                passwordDialog = true
+                            } else {
+                                errorMessage = "Could not read this PDF: ${e.message ?: "unsupported or damaged file"}"
+                            }
                         } finally {
                             password = ""
                             loading = false
