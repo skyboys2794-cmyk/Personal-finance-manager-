@@ -113,6 +113,7 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
     var tab by remember { mutableStateOf(0) }
     var backupDialog by remember { mutableStateOf(false) }
     var pdfStatementImport by remember { mutableStateOf(false) }
+    var autoCaptureSettings by remember { mutableStateOf(false) }
     var backupMode by remember { mutableStateOf("export") }
     var backupPassword by remember { mutableStateOf("") }
     var pendingRestoreUri by remember { mutableStateOf<android.net.Uri?>(null) }
@@ -312,6 +313,7 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
                 onReports = { reportsDialog = true },
                 onImportCsv = { csvPicker.launch(arrayOf("text/*", "application/vnd.ms-excel")) },
                 onImportPdf = { pdfStatementImport = true },
+                onAutoCapture = { autoCaptureSettings = true },
                 onBackup = { backupMode = "export"; backupDialog = true },
                 onRestore = { backupMode = "restore"; backupDialog = true },
                 onSheets = { beginSheetsSync() },
@@ -321,6 +323,7 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
     }
 
     if (pdfStatementImport) PdfStatementImportDialog(dao) { pdfStatementImport = false }
+    if (autoCaptureSettings) AutoCaptureSettingsDialog(dao) { autoCaptureSettings = false }
 
     if (showAdd) AddTransactionDialog(accounts, { showAdd = false }, onSave = { title, amount, type, category, accountId, method, tags, recurring, frequency ->
         scope.launch(Dispatchers.IO) {
