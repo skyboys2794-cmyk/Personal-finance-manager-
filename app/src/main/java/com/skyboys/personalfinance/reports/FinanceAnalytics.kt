@@ -18,15 +18,27 @@ data class MonthlyReport(val monthLabel: String, val incomePaise: Long, val expe
 
 object FinanceAnalytics {
     fun summarize(items: List<FinanceTransaction>, month: Calendar = Calendar.getInstance()): FinanceSummary {
-        val start = (month.clone() as Calendar).apply { set(Calendar.DAY_OF_MONTH, 1); set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }.timeInMillis
-        val end = (month.clone() as Calendar).apply { add(Calendar.MONTH, 1); set(Calendar.DAY_OF_MONTH, 1); set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0) }.timeInMillis
-        val current = items.filter { it.dateMillis >= start && it.dateMillis < end }
+        val start = (month.clone() as Calendar).apply {
+            set(Calendar.DAY_OF_MONTH, 1); set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        val end = (month.clone() as Calendar).apply {
+            add(Calendar.MONTH, 1); set(Calendar.DAY_OF_MONTH, 1); set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        return summarizeRange(items, start, end, java.text.SimpleDateFormat("MMMM yyyy", java.util.Locale.getDefault()).format(month.time))
+    }
+
+    fun summarizeRange(items: List<FinanceTransaction>, startInclusive: Long, endExclusive: Long, label: String): FinanceSummary {
+        require(endExclusive >= startInclusive) { "End date must not be before start date" }
+        val current = items.filter { it.dateMillis >= startInclusive && it.dateMillis < endExclusive }
         val income = current.filter { it.type == "INCOME" }.sumOf { it.amountPaise }
         val expenses = current.filter { it.type == "EXPENSE" }
         val total = expenses.sumOf { it.amountPaise }
-        return FinanceSummary(income, total, income - total,
-            expenses.groupBy { it.category }.mapValues { (_, tx) -> tx.sumOf { it.amountPaise } }.toList().sortedByDescending { it.second }.toMap(),
-            java.text.SimpleDateFormat("MMMM yyyy", java.util.Locale.getDefault()).format(month.time))
+        return FinanceSummary(
+            income, total, income - total,
+            expenses.groupBy { it.category }.mapValues { (_, tx) -> tx.sumOf { it.amountPaise } }
+                .toList().sortedByDescending { it.second }.toMap(),
+            label
+        )
     }
 
     fun monthlyTrend(items: List<FinanceTransaction>, count: Int = 6, now: Calendar = Calendar.getInstance()): List<MonthlyReport> {
