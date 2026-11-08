@@ -1,8 +1,11 @@
 package com.skyboys.personalfinance
 
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -15,27 +18,28 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.ReceiptLong
-import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.TrendingUp
 import androidx.compose.material3.*
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
+import com.skyboys.personalfinance.backup.EncryptedBackup
 import com.skyboys.personalfinance.data.FinanceAccount
 import com.skyboys.personalfinance.data.FinanceDatabase
 import com.skyboys.personalfinance.data.FinanceTransaction
+import com.skyboys.personalfinance.importer.CsvTransactionParser
 import com.skyboys.personalfinance.reports.FinanceAnalytics
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -51,7 +55,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val dao = FinanceDatabase.get(this).financeDao()
-        lifecycleScope.launch {
+        lifecycleScope.launch(Dispatchers.IO) {
             if (dao.allAccounts().isEmpty()) {
                 dao.insertAccount(FinanceAccount(name = "Cash wallet", type = "CASH"))
                 dao.insertAccount(FinanceAccount(name = "Primary bank", type = "BANK"))
@@ -63,26 +67,59 @@ class MainActivity : ComponentActivity() {
                     primary = Forest, onPrimary = Color.White, primaryContainer = Mint,
                     secondary = Color(0xFFB7D8C8), background = Color(0xFFF6F8F6),
                     surface = Color.White, onSurface = Ink, error = Coral
-                ),
-                typography = Typography()
-            ) {
-                FinanceApp(dao)
-            }
+                )
+            ) { FinanceApp(dao) }
         }
     }
 }
 
-private suspend fun com.skyboys.personalfinance.data.FinanceDao.observeAccountsSnapshotEmpty(): Boolean =
-    allTransactions().isEmpty()
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
+    val context = LocalContext.current
     val transactions by dao.observeAll().collectAsStateWithLifecycle(initialValue = emptyList())
     val accounts by dao.observeAccounts().collectAsStateWithLifecycle(initialValue = emptyList())
+    val scope = rememberCoroutineScope()
     var showAdd by remember { mutableStateOf(false) }
     var tab by remember { mutableStateOf(0) }
-    val summary = remember(transactions) { FinanceAnalytics.summarize(transactions) }\n    val scope = rememberCoroutineScope()
+    var backupDialog by remember { mutableStateOf(false) }
+    var backupMode by remember { mutableStateOf("export") }
+    var backupPassword by remember { mutableStateOf("") }
+    val summary = remember(transactions) { FinanceAnalytics.summarize(transactions) }
+
+    val csvPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) scope.launch {
+            try {
+                val csv = withContext(Dispatchers.IO) { context.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() } ?: "" }
+                val parsed = withContext(Dispatchers.Default) { CsvTransactionParser.parse(csv) }
+                if (parsed.transactions.isNotEmpty()) withContext(Dispatchers.IO) { dao.insertAll(parsed.transactions) }
+                Toast.makeText(context, "Imported ${parsed.transactions.size} transactions. ${parsed.errors.size} rows skipped.", Toast.LENGTH_LONG).show()
+            } catch (e: Exception) {
+                Toast.makeText(context, "CSV import failed: ${e.message}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+    val backupExporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/octet-stream")) { uri ->
+        if (uri != null) scope.launch {
+            try {
+                val bytes = withContext(Dispatchers.IO) { EncryptedBackup.export(dao.allTransactions(), backupPassword.toCharArray()) }
+                withContext(Dispatchers.IO) { context.contentResolver.openOutputStream(uri)?.use { it.write(bytes) } }
+                Toast.makeText(context, "Encrypted backup saved.", Toast.LENGTH_LONG).show()
+            } catch (e: Exception) { Toast.makeText(context, "Backup failed: ${e.message}", Toast.LENGTH_LONG).show() }
+            backupPassword = ""
+        }
+    }
+    val backupImporter = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) scope.launch {
+            try {
+                val bytes = withContext(Dispatchers.IO) { context.contentResolver.openInputStream(uri)?.use { it.readBytes() } ?: byteArrayOf() }
+                val restored = withContext(Dispatchers.Default) { EncryptedBackup.restore(bytes, backupPassword.toCharArray()) }
+                withContext(Dispatchers.IO) { dao.insertAll(restored) }
+                Toast.makeText(context, "Restored ${restored.size} transactions.", Toast.LENGTH_LONG).show()
+            } catch (e: Exception) { Toast.makeText(context, "Restore failed. Check the password and backup file.", Toast.LENGTH_LONG).show() }
+            backupPassword = ""
+        }
+    }
 
     Scaffold(
         containerColor = Color(0xFFF6F8F6),
@@ -95,7 +132,8 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
                     }
                 },
                 actions = {
-                    Text("₹ INR", modifier = Modifier.padding(end = 18.dp), color = Forest, fontWeight = FontWeight.SemiBold)
+                    TextButton(onClick = { csvPicker.launch(arrayOf("text/*", "application/vnd.ms-excel")) }) { Text("Import CSV") }
+                    TextButton(onClick = { backupMode = "export"; backupDialog = true }) { Text("Backup") }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFF6F8F6))
             )
@@ -114,59 +152,57 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
         }
     ) { padding ->
         when (tab) {
-            0 -> Dashboard(
-                modifier = Modifier.padding(padding), transactions = transactions,
-                income = summary.incomePaise, expenses = summary.expensePaise,
-                netFlow = summary.netCashFlowPaise, categories = summary.expenseByCategory
-            )
-            1 -> ActivityList(Modifier.padding(padding), transactions) { id ->
-                (dao as? Any)?.let { /* handled below by caller scope */ }
-            }
+            0 -> Dashboard(Modifier.padding(padding), transactions, summary.incomePaise, summary.expensePaise, summary.netCashFlowPaise, summary.expenseByCategory)
+            1 -> ActivityList(Modifier.padding(padding), transactions) { id -> scope.launch(Dispatchers.IO) { dao.delete(id) } }
             else -> AccountsList(Modifier.padding(padding), accounts)
         }
     }
 
-    if (showAdd) {
-        AddTransactionDialog(
-            accounts = accounts,
-            onDismiss = { showAdd = false },
-            onSave = { title, amount, type, category, accountId, method, tags ->
-                (dao).let { target ->
-                    // Room writes are dispatched by the activity lifecycle scope via the DAO coroutine.
-                    kotlinx.coroutines.GlobalScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-                        target.insert(FinanceTransaction(
-                            title = title, amountPaise = (amount * 100).toLong(),
-                            type = type, category = category, accountId = accountId,
-                            paymentMethod = method, tags = tags
-                        ))
-                    }
+    if (showAdd) AddTransactionDialog(accounts, { showAdd = false }) { title, amount, type, category, accountId, method, tags ->
+        scope.launch(Dispatchers.IO) {
+            dao.insert(FinanceTransaction(title = title, amountPaise = (amount * 100).toLong(), type = type,
+                category = category, accountId = accountId, paymentMethod = method, tags = tags))
+        }
+        showAdd = false
+    }
+
+    if (backupDialog) {
+        AlertDialog(
+            onDismissRequest = { backupDialog = false; backupPassword = "" },
+            title = { Text(if (backupMode == "export") "Create encrypted backup" else "Restore backup") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Your transaction history is encrypted on your device before saving. Keep this password safe; it cannot be recovered.")
+                    OutlinedTextField(
+                        value = backupPassword, onValueChange = { backupPassword = it },
+                        label = { Text("Backup password (10+ characters)") },
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        singleLine = true
+                    )
                 }
-                showAdd = false
+            },
+            confirmButton = {
+                TextButton(enabled = backupPassword.length >= 10, onClick = {
+                    backupDialog = false
+                    if (backupMode == "export") backupExporter.launch("personal-finance-backup.pfm")
+                    else backupImporter.launch(arrayOf("*/*"))
+                }) { Text(if (backupMode == "export") "Save backup" else "Choose backup") }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = { backupMode = "restore" }) { Text("Restore instead") }
+                    TextButton(onClick = { backupDialog = false; backupPassword = "" }) { Text("Cancel") }
+                }
             }
         )
     }
 }
 
 @Composable
-private fun Dashboard(
-    modifier: Modifier,
-    transactions: List<FinanceTransaction>,
-    income: Long,
-    expenses: Long,
-    netFlow: Long,
-    categories: Map<String, Long>
-) {
-    LazyColumn(
-        modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 96.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
+private fun Dashboard(modifier: Modifier, transactions: List<FinanceTransaction>, income: Long, expenses: Long, netFlow: Long, categories: Map<String, Long>) {
+    LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 12.dp, bottom = 96.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item {
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(26.dp),
-                colors = CardDefaults.cardColors(containerColor = Forest)
-            ) {
+            Card(Modifier.fillMaxWidth(), shape = RoundedCornerShape(26.dp), colors = CardDefaults.cardColors(containerColor = Forest)) {
                 Column(Modifier.padding(22.dp)) {
                     Text("NET CASH FLOW · THIS MONTH", color = Color(0xFFD1E9DD), style = MaterialTheme.typography.labelMedium)
                     Spacer(Modifier.height(8.dp))
@@ -185,9 +221,8 @@ private fun Dashboard(
                 Text(SimpleDateFormat("MMMM", Locale.getDefault()).format(Date()), color = Muted, style = MaterialTheme.typography.labelMedium)
             }
         }
-        if (categories.isEmpty()) {
-            item { EmptyCard("Your spending chart will appear here", "Add expenses to see where your money goes.") }
-        } else {
+        if (categories.isEmpty()) item { EmptyCard("Your spending chart will appear here", "Add expenses to see where your money goes.") }
+        else {
             item { SpendingChart(categories) }
             items(categories.entries.toList()) { (category, amount) ->
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -197,9 +232,7 @@ private fun Dashboard(
                 }
             }
         }
-        item {
-            Text("Recent activity", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-        }
+        item { Text("Recent activity", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
         items(transactions.take(4), key = { it.id }) { TransactionRow(it) }
         if (transactions.isEmpty()) item { EmptyCard("No transactions yet", "Tap + to add your first income or expense.") }
     }
@@ -250,12 +283,12 @@ private fun TransactionRow(transaction: FinanceTransaction, onDelete: (() -> Uni
             }
             Column(Modifier.weight(1f).padding(start = 12.dp)) {
                 Text(transaction.title, fontWeight = FontWeight.SemiBold, color = Ink)
-                Text("${transaction.category} · ${dateLabel(transaction.dateMillis)}", color = Muted, style = MaterialTheme.typography.bodySmall)
+                Text("${transaction.category} · ${dateLabel(transaction.dateMillis)} · ${transaction.paymentMethod}", color = Muted, style = MaterialTheme.typography.bodySmall)
                 if (transaction.tags.isNotBlank()) Text(transaction.tags, color = Forest, style = MaterialTheme.typography.labelSmall)
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text((if (transaction.type == "INCOME") "+" else "−") + money(transaction.amountPaise), color = if (transaction.type == "INCOME") Forest else Coral, fontWeight = FontWeight.Bold)
-                if (onDelete != null) {\n                    IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, contentDescription = "Delete transaction", tint = Muted) }\n                }
+                if (onDelete != null) IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, contentDescription = "Delete transaction", tint = Muted) }
             }
         }
     }
@@ -265,7 +298,7 @@ private fun TransactionRow(transaction: FinanceTransaction, onDelete: (() -> Uni
 private fun AccountsList(modifier: Modifier, accounts: List<FinanceAccount>) {
     LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { Text("Your accounts", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
-        item { Text("Keep cash, bank accounts and credit cards together. Add account balances in the next account-management step.", color = Muted) }
+        item { Text("Cash, bank accounts and cards can be recorded separately. Manual tracking works without bank sync.", color = Muted) }
         items(accounts, key = { it.id }) { account ->
             Card(shape = RoundedCornerShape(18.dp)) {
                 Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -291,12 +324,9 @@ private fun EmptyCard(title: String, subtitle: String) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun AddTransactionDialog(
-    accounts: List<FinanceAccount>,
-    onDismiss: () -> Unit,
-    onSave: (String, Double, String, String, Long?, String, String) -> Unit
-) {
+private fun AddTransactionDialog(accounts: List<FinanceAccount>, onDismiss: () -> Unit, onSave: (String, Double, String, String, Long?, String, String) -> Unit) {
     var title by remember { mutableStateOf("") }
     var amount by remember { mutableStateOf("") }
     var type by remember { mutableStateOf("EXPENSE") }
@@ -304,6 +334,7 @@ private fun AddTransactionDialog(
     var accountId by remember { mutableStateOf<Long?>(accounts.firstOrNull()?.id) }
     var method by remember { mutableStateOf("UPI") }
     var tags by remember { mutableStateOf("") }
+    var accountExpanded by remember { mutableStateOf(false) }
     val categories = listOf("Food", "Travel", "Bills", "Shopping", "Health", "Salary", "Business", "Other")
     val methods = listOf("UPI", "CASH", "CARD", "BANK_TRANSFER", "WALLET")
     val validAmount = amount.toDoubleOrNull()?.let { it > 0 && it.isFinite() } == true
@@ -327,32 +358,28 @@ private fun AddTransactionDialog(
                     }
                 }
                 Text("Payment method", style = MaterialTheme.typography.labelMedium)
-                Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                    methods.take(3).forEach { item -> FilterChip(method == item, { method = item }, label = { Text(item, style = MaterialTheme.typography.labelSmall) }) }
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-                    methods.drop(3).forEach { item -> FilterChip(method == item, { method = item }, label = { Text(item, style = MaterialTheme.typography.labelSmall) }) }
+                methods.chunked(3).forEach { row ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                        row.forEach { item -> FilterChip(method == item, { method = item }, label = { Text(item, style = MaterialTheme.typography.labelSmall) }) }
+                    }
                 }
                 if (accounts.isNotEmpty()) {
-                    var expanded by remember { mutableStateOf(false) }
-                    ExposedDropdownMenuBox(expanded, { expanded = it }) {
+                    ExposedDropdownMenuBox(accountExpanded, { accountExpanded = it }) {
                         OutlinedTextField(
                             value = accounts.firstOrNull { it.id == accountId }?.name ?: "Select account",
                             onValueChange = {}, readOnly = true, label = { Text("Account") },
-                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded) },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(accountExpanded) },
                             modifier = Modifier.menuAnchor().fillMaxWidth()
                         )
-                        ExposedDropdownMenu(expanded, { expanded = false }) {
-                            accounts.forEach { a -> DropdownMenuItem(text = { Text(a.name) }, onClick = { accountId = a.id; expanded = false }) }
+                        ExposedDropdownMenu(accountExpanded, { accountExpanded = false }) {
+                            accounts.forEach { a -> DropdownMenuItem(text = { Text(a.name) }, onClick = { accountId = a.id; accountExpanded = false }) }
                         }
                     }
                 }
                 OutlinedTextField(tags, { tags = it }, label = { Text("Tags (comma separated)") }, singleLine = true)
             }
         },
-        confirmButton = {
-            TextButton(enabled = title.isNotBlank() && validAmount, onClick = { onSave(title.trim(), amount.toDouble(), type, category, accountId, method, tags) }) { Text("Save") }
-        },
+        confirmButton = { TextButton(enabled = title.isNotBlank() && validAmount, onClick = { onSave(title.trim(), amount.toDouble(), type, category, accountId, method, tags) }) { Text("Save") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     )
 }
