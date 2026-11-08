@@ -1,6 +1,8 @@
 package com.skyboys.personalfinance
 
 import android.os.Bundle
+import android.os.Build
+import android.Manifest
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -38,6 +40,8 @@ import com.skyboys.personalfinance.data.FinanceDatabase
 import com.skyboys.personalfinance.data.FinanceTransaction
 import com.skyboys.personalfinance.importer.CsvTransactionParser
 import com.skyboys.personalfinance.reports.FinanceAnalytics
+import com.skyboys.personalfinance.notifications.FinanceNotifications
+import com.skyboys.personalfinance.notifications.BudgetAlertEvaluator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -55,6 +59,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         val dao = FinanceDatabase.get(this).financeDao()
+        FinanceNotifications.ensureChannel(this)
+        FinanceNotifications.scheduleBillChecks(this)
+        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {\n            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 701)\n        }
         lifecycleScope.launch(Dispatchers.IO) {
             if (dao.allAccounts().isEmpty()) {
                 dao.insertAccount(FinanceAccount(name = "Cash wallet", type = "CASH"))
