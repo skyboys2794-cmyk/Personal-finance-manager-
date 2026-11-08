@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 
 @Composable
 fun FinanceSettingsScreen(
+    modifier: Modifier = Modifier,
     onReports: () -> Unit,
     onImportCsv: () -> Unit,
     onBackup: () -> Unit,
@@ -27,7 +28,7 @@ fun FinanceSettingsScreen(
     onCustomize: () -> Unit
 ) {
     LazyColumn(
-        modifier = Modifier.fillMaxSize(),
+        modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 18.dp, end = 18.dp, top = 16.dp, bottom = 32.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
