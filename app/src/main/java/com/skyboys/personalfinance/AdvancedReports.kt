@@ -26,6 +26,9 @@ fun AdvancedReports(modifier: Modifier = Modifier, transactions: List<FinanceTra
     val summary = remember(transactions) { FinanceAnalytics.summarize(transactions) }
     val categories = summary.expenseByCategory.entries.toList()
     val maxValue = (trend.flatMap { listOf(it.incomePaise, it.expensePaise) }.maxOrNull() ?: 1L).coerceAtLeast(1L).toFloat()
+    val incomeColor = MaterialTheme.colorScheme.primary
+    val expenseColor = MaterialTheme.colorScheme.error
+    val donutColor = MaterialTheme.colorScheme.tertiary
 
     Column(modifier.fillMaxSize().padding(18.dp), verticalArrangement=Arrangement.spacedBy(14.dp)) {
         Text("Financial reports", style=MaterialTheme.typography.headlineSmall, fontWeight=FontWeight.Bold)
@@ -50,8 +53,8 @@ fun AdvancedReports(modifier: Modifier = Modifier, transactions: List<FinanceTra
                                 val barW=groupWidth*.22f
                                 val h1=usable*m.incomePaise.toFloat()/maxValue
                                 val h2=usable*m.expensePaise.toFloat()/maxValue
-                                drawRoundRect(MaterialTheme.colorScheme.primary,Offset(center-barW-2.dp.toPx(),bottom-h1),androidx.compose.ui.geometry.Size(barW,h1),cornerRadius=androidx.compose.ui.geometry.CornerRadius(4.dp.toPx()))
-                                drawRoundRect(MaterialTheme.colorScheme.error,Offset(center+2.dp.toPx(),bottom-h2),androidx.compose.ui.geometry.Size(barW,h2),cornerRadius=androidx.compose.ui.geometry.CornerRadius(4.dp.toPx()))
+                                drawRoundRect(incomeColor,Offset(center-barW-2.dp.toPx(),bottom-h1),androidx.compose.ui.geometry.Size(barW,h1),cornerRadius=androidx.compose.ui.geometry.CornerRadius(4.dp.toPx()))
+                                drawRoundRect(expenseColor,Offset(center+2.dp.toPx(),bottom-h2),androidx.compose.ui.geometry.Size(barW,h2),cornerRadius=androidx.compose.ui.geometry.CornerRadius(4.dp.toPx()))
                             }
                         }
                         ReportChart.LINE -> {
@@ -64,15 +67,15 @@ fun AdvancedReports(modifier: Modifier = Modifier, transactions: List<FinanceTra
                                 }
                                 drawPath(path,color,style=Stroke(width=3.dp.toPx(),cap=StrokeCap.Round))
                             }
-                            drawSeries(trend.map{it.incomePaise},MaterialTheme.colorScheme.primary)
-                            drawSeries(trend.map{it.expensePaise},MaterialTheme.colorScheme.error)
+                            drawSeries(trend.map{it.incomePaise},incomeColor)
+                            drawSeries(trend.map{it.expensePaise},expenseColor)
                         }
                         ReportChart.DONUT -> {
                             val total=categories.sumOf{it.value}.coerceAtLeast(1L).toFloat()
                             var angle=-90f
                             categories.take(8).forEachIndexed { i, entry ->
                                 val sweep=360f*entry.value/total
-                                drawArc(if(i%2==0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.tertiary,angle,sweep,false,
+                                drawArc(if(i%2==0) incomeColor else donutColor,angle,sweep,false,
                                     topLeft=Offset((size.width-size.height*.82f)/2,(size.height-size.height*.82f)/2),
                                     size=androidx.compose.ui.geometry.Size(size.height*.82f,size.height*.82f),
                                     style=Stroke(width=28.dp.toPx(),cap=StrokeCap.Butt))
