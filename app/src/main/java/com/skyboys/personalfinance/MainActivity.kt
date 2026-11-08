@@ -24,6 +24,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.TrendingUp
@@ -107,6 +108,7 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
     val accounts by dao.observeAccounts().collectAsStateWithLifecycle(initialValue = emptyList())
     val scope = rememberCoroutineScope()
     var showAdd by remember { mutableStateOf(false) }
+    var editingTransaction by remember { mutableStateOf<FinanceTransaction?>(null) }
     var tab by remember { mutableStateOf(0) }
     var backupDialog by remember { mutableStateOf(false) }
     var backupMode by remember { mutableStateOf("export") }
@@ -292,7 +294,7 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
                 onPeriodChange = { dashboardPeriod = it },
                 onCustomRange = { chooseCustomRange() }
             )
-            1 -> ActivityList(Modifier.padding(padding), transactions) { id -> scope.launch(Dispatchers.IO) { dao.delete(id) } }
+            1 -> ActivityList(Modifier.padding(padding), transactions, onEdit = { editingTransaction = it }, onDelete = { id -> scope.launch(Dispatchers.IO) { dao.delete(id) } })
             2 -> AccountManagementScreen(Modifier.padding(padding), accounts, dao)
             3 -> ManagementScreen(dao)
             else -> FinanceSettingsScreen(
@@ -306,7 +308,7 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
         }
     }
 
-    if (showAdd) AddTransactionDialog(accounts, { showAdd = false }) { title, amount, type, category, accountId, method, tags, recurring, frequency ->
+    if (showAdd) AddTransactionDialog(accounts, { showAdd = false }, onSave = { title, amount, type, category, accountId, method, tags, recurring, frequency ->
         scope.launch(Dispatchers.IO) {
             val transaction = FinanceTransaction(title = title, amountPaise = (amount * 100).toLong(), type = type,
                 category = category, accountId = accountId, paymentMethod = method, tags = tags,
@@ -315,6 +317,23 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
             BudgetAlertEvaluator.evaluate(context, transaction)
         }
         showAdd = false
+    })
+
+    editingTransaction?.let { current ->
+        AddTransactionDialog(
+            accounts = accounts,
+            onDismiss = { editingTransaction = null },
+            initial = current,
+            onSave = { title, amount, type, category, accountId, method, tags, recurring, frequency ->
+                scope.launch(Dispatchers.IO) {
+                    dao.updateTransaction(
+                        current.id, title, (amount * 100).toLong(), type, category, accountId,
+                        method, tags, current.notes, recurring, frequency
+                    )
+                }
+                editingTransaction = null
+            }
+        )
     }
 
     if (customizeDashboard) {
@@ -515,16 +534,23 @@ private fun SpendingChart(categories: Map<String, Long>) {
 }
 
 @Composable
-private fun ActivityList(modifier: Modifier, transactions: List<FinanceTransaction>, onDelete: (Long) -> Unit) {
+private fun ActivityList(
+    modifier: Modifier,
+    transactions: List<FinanceTransaction>,
+    onEdit: (FinanceTransaction) -> Unit,
+    onDelete: (Long) -> Unit
+) {
     LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         item { Text("All transactions", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
-        items(transactions, key = { it.id }) { TransactionRow(it) { onDelete(it.id) } }
+        items(transactions, key = { it.id }) {
+            TransactionRow(it, onDelete = { onDelete(it.id) }, onEdit = { onEdit(it) })
+        }
         if (transactions.isEmpty()) item { EmptyCard("Nothing here yet", "Your saved transactions will appear here.") }
     }
 }
 
 @Composable
-private fun TransactionRow(transaction: FinanceTransaction, onDelete: (() -> Unit)? = null) {
+private fun TransactionRow(transaction: FinanceTransaction, onDelete: (() -> Unit)? = null, onEdit: (() -> Unit)? = null) {
     Card(shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = Color.White)) {
         Row(Modifier.fillMaxWidth().padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.size(42.dp).clip(CircleShape).background(if (transaction.type == "INCOME") Mint else Color(0xFFFFEFEC)), contentAlignment = Alignment.Center) {
@@ -538,7 +564,12 @@ private fun TransactionRow(transaction: FinanceTransaction, onDelete: (() -> Uni
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text((if (transaction.type == "INCOME") "+" else "−") + money(transaction.amountPaise), color = if (transaction.type == "INCOME") Forest else Coral, fontWeight = FontWeight.Bold)
-                if (onDelete != null) IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, contentDescription = "Delete transaction", tint = Muted) }
+                if (onEdit != null || onDelete != null) {
+                    Row {
+                        if (onEdit != null) IconButton(onClick = onEdit) { Icon(Icons.Default.Edit, contentDescription = "Edit transaction", tint = Muted) }
+                        if (onDelete != null) IconButton(onClick = onDelete) { Icon(Icons.Default.Delete, contentDescription = "Delete transaction", tint = Muted) }
+                    }
+                }
             }
         }
     }
@@ -638,17 +669,18 @@ private fun EmptyCard(title: String, subtitle: String) {
 private fun AddTransactionDialog(
     accounts: List<FinanceAccount>,
     onDismiss: () -> Unit,
-    onSave: (String, Double, String, String, Long?, String, String, Boolean, String) -> Unit
+    onSave: (String, Double, String, String, Long?, String, String, Boolean, String) -> Unit,
+    initial: FinanceTransaction? = null
 ) {
-    var title by remember { mutableStateOf("") }
-    var amount by remember { mutableStateOf("") }
-    var type by remember { mutableStateOf("EXPENSE") }
-    var category by remember { mutableStateOf("Food") }
-    var method by remember { mutableStateOf("UPI") }
-    var accountId by remember { mutableStateOf(accounts.firstOrNull { it.type == "BANK" }?.id ?: accounts.firstOrNull()?.id) }
-    var tags by remember { mutableStateOf("") }
-    var recurring by remember { mutableStateOf(false) }
-    var frequency by remember { mutableStateOf("MONTHLY") }
+    var title by remember(initial?.id) { mutableStateOf(initial?.title.orEmpty()) }
+    var amount by remember(initial?.id) { mutableStateOf(initial?.let { (it.amountPaise / 100.0).toString() }.orEmpty()) }
+    var type by remember(initial?.id) { mutableStateOf(initial?.type ?: "EXPENSE") }
+    var category by remember(initial?.id) { mutableStateOf(initial?.category ?: "Food") }
+    var method by remember(initial?.id) { mutableStateOf(initial?.paymentMethod ?: "UPI") }
+    var accountId by remember(initial?.id) { mutableStateOf(initial?.accountId ?: accounts.firstOrNull { it.type == "BANK" }?.id ?: accounts.firstOrNull()?.id) }
+    var tags by remember(initial?.id) { mutableStateOf(initial?.tags.orEmpty()) }
+    var recurring by remember(initial?.id) { mutableStateOf(initial?.isRecurring ?: false) }
+    var frequency by remember(initial?.id) { mutableStateOf(initial?.recurrenceFrequency ?: "MONTHLY") }
     var categoryExpanded by remember { mutableStateOf(false) }
     var methodExpanded by remember { mutableStateOf(false) }
     var accountExpanded by remember { mutableStateOf(false) }
@@ -672,7 +704,7 @@ private fun AddTransactionDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("New transaction", fontWeight = FontWeight.Bold) },
+        title = { Text(if (initial == null) "New transaction" else "Edit transaction", fontWeight = FontWeight.Bold) },
         text = {
             Column(
                 Modifier.fillMaxWidth().heightIn(max = 440.dp).verticalScroll(rememberScrollState()),
