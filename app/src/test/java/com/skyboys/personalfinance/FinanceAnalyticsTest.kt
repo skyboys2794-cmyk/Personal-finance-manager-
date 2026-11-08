@@ -32,4 +32,23 @@ class FinanceAnalyticsTest {
         assertEquals(25_000L, summary.expensePaise)
         assertEquals(475_000L, summary.netCashFlowPaise)
     }
+    @Test fun customDateRangeIncludesStartAndExcludesEnd() {
+        val start = java.util.Calendar.getInstance().apply {
+            set(2026, java.util.Calendar.OCTOBER, 1, 0, 0, 0); set(java.util.Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        val end = java.util.Calendar.getInstance().apply {
+            set(2026, java.util.Calendar.NOVEMBER, 1, 0, 0, 0); set(java.util.Calendar.MILLISECOND, 0)
+        }.timeInMillis
+        val transactions = listOf(
+            FinanceTransaction(title="Start day", amountPaise=1000, type="INCOME", category="Salary", dateMillis=start),
+            FinanceTransaction(title="Inside", amountPaise=2500, type="EXPENSE", category="Food", dateMillis=start + 86_400_000L),
+            FinanceTransaction(title="End boundary", amountPaise=9000, type="EXPENSE", category="Food", dateMillis=end)
+        )
+        val summary = FinanceAnalytics.summarizeRange(transactions, start, end, "October 2026")
+        assertEquals(1000L, summary.incomePaise)
+        assertEquals(2500L, summary.expensePaise)
+        assertEquals(2500L, summary.expenseByCategory["Food"])
+        assertEquals("October 2026", summary.monthLabel)
+    }
+
 }
