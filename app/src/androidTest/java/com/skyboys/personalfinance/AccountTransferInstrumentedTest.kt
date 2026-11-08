@@ -22,21 +22,17 @@ class AccountTransferInstrumentedTest {
         val fromId = dao.insertAccount(FinanceAccount(name="Test source $suffix"))
         val toId = dao.insertAccount(FinanceAccount(name="Test destination $suffix"))
         val transferId = UUID.randomUUID().toString()
-        dao.insertAll(listOf(
+        dao.insertTransferPair(
             FinanceTransaction(title="Transfer out", amountPaise=1500, type="TRANSFER_OUT", category="Transfers", accountId=fromId, transferId=transferId),
             FinanceTransaction(title="Transfer in", amountPaise=1500, type="TRANSFER_IN", category="Transfers", accountId=toId, transferId=transferId)
-        ))
+        )
         dao.saveReminder(BillReminder(title="Test bill $suffix", amountPaise=1000, dueDay=10, accountId=fromId))
         dao.updateAccount(fromId, "Edited source $suffix", "Test bank", "BANK", 5000, "INR", true)
         assertEquals("Edited source $suffix", dao.allAccounts().first { it.id == fromId }.name)
         assertEquals(2, dao.allTransactions().count { it.transferId == transferId })
 
-        val linked = dao.transferIdsForAccount(fromId)
-        assertEquals(listOf(transferId), linked)
-        dao.deleteTransfers(linked)
-        dao.detachTransactionsFromAccount(fromId)
-        dao.detachRemindersFromAccount(fromId)
-        dao.deleteAccount(fromId)
+        assertEquals(listOf(transferId), dao.transferIdsForAccount(fromId))
+        dao.deleteAccountSafely(fromId)
         assertFalse(dao.allAccounts().any { it.id == fromId })
         assertFalse(dao.allTransactions().any { it.transferId == transferId })
         assertNull(dao.allReminders().first { it.title == "Test bill $suffix" }.accountId)
