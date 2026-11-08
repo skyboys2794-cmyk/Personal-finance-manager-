@@ -61,7 +61,9 @@ class MainActivity : ComponentActivity() {
         val dao = FinanceDatabase.get(this).financeDao()
         FinanceNotifications.ensureChannel(this)
         FinanceNotifications.scheduleBillChecks(this)
-        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {\n            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 701)\n        }
+        if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 701)
+        }
         lifecycleScope.launch(Dispatchers.IO) {
             if (dao.allAccounts().isEmpty()) {
                 dao.insertAccount(FinanceAccount(name = "Cash wallet", type = "CASH"))
@@ -167,8 +169,10 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
 
     if (showAdd) AddTransactionDialog(accounts, { showAdd = false }) { title, amount, type, category, accountId, method, tags ->
         scope.launch(Dispatchers.IO) {
-            dao.insert(FinanceTransaction(title = title, amountPaise = (amount * 100).toLong(), type = type,
-                category = category, accountId = accountId, paymentMethod = method, tags = tags))
+            val transaction = FinanceTransaction(title = title, amountPaise = (amount * 100).toLong(), type = type,
+                category = category, accountId = accountId, paymentMethod = method, tags = tags)
+            dao.insert(transaction)
+            BudgetAlertEvaluator.evaluate(context, transaction)
         }
         showAdd = false
     }
