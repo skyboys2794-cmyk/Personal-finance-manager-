@@ -8,6 +8,7 @@ The GitHub Actions workflow runs:
 
 Instrumentation coverage includes:
 - Main dashboard and navigation between Overview, Activity, Accounts and Plans.
+- Account edit/delete operations, paired transfer writes and safe transfer cleanup during account deletion.
 - Encrypted backup round-trip for transactions, accounts, budgets and bill reminders.
 - Rejection of an incorrect backup password.
 
