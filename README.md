@@ -18,7 +18,7 @@ credit cards without paid bank-sync APIs or sharing bank credentials.
 - Password-encrypted full-data backups for transactions, accounts, budgets and bill reminders using PBKDF2-HMAC-SHA256 and AES-256-GCM. Restore validates/decrypts before replacing the local dataset; legacy v1 transaction-only backups remain readable.
 - Interactive reports with monthly income/expense bar charts, trend line charts, category donut charts and 3/6/12-month filters.
 - WorkManager bill reminder checks and threshold notification evaluator.
-- Google Sheets REST upload adapter; see integration status below.
+- Optional Google Sheets backup adapter (current implementation is a one-way transaction snapshot; full account-aware restore and conflict-safe two-way sync are planned in [the onboarding and sync design](docs/FINANCE_ONBOARDING_AND_SHEETS_SYNC.md)).
 - GitHub Actions debug APK workflow.
 
 ## Build and download
@@ -42,7 +42,7 @@ does not connect to bank accounts or request bank passwords.
 
 Complete finance backups are encrypted on-device before the user selects a file location. Use a strong password of at least 10 characters and keep it safe: there is no password recovery. Restore replaces the current local dataset with the backup contents. The Room database remains local app-private storage and is not itself encrypted at rest. Android cloud backup is disabled.
 
-Google Sheets is optional and requires explicit user authorization. The in-app OAuth consent flow and Sheets upload are wired, but the owner must
+Google Sheets is optional and requires explicit user authorization. The current in-app OAuth consent flow creates a transaction snapshot; it does not yet provide full two-way synchronization or account/card restoration. The owner must
 configure an app-specific OAuth client, enable the Sheets API, and register the
 Android package name plus signing-certificate SHA-1. Follow
 [Google Sheets setup](docs/GOOGLE_SHEETS_BACKUP.md). Never commit client
@@ -58,7 +58,7 @@ secrets, access tokens, bank credentials or real financial data.
 - `AdvancedReports.kt`: interactive bar, line and donut chart views.
 - `notifications/`: bill reminder worker and budget threshold notification logic.
 
-Accounts can be added manually; monthly budgets and bill reminders can be configured
+New installations open the Accounts tab first and do not receive placeholder bank/cash accounts; add your real banks, wallets and credit cards with their starting balances and card limits. Monthly budgets and bill reminders can be configured
 in the Plans tab. The next milestones are account editing/deletion, richer reports,
 credit-card payment reconciliation and dashboard widget expansion. Budget threshold
 alerts are evaluated on newly recorded expenses; bill reminder checks run daily. Review imported bank CSV sign conventions before relying on totals.
