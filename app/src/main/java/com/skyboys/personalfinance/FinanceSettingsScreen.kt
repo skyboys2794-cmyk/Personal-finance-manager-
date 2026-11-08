@@ -22,6 +22,7 @@ fun FinanceSettingsScreen(
     modifier: Modifier = Modifier,
     onReports: () -> Unit,
     onImportCsv: () -> Unit,
+    onImportPdf: () -> Unit,
     onBackup: () -> Unit,
     onRestore: () -> Unit,
     onSheets: () -> Unit,
@@ -41,7 +42,8 @@ fun FinanceSettingsScreen(
         item { SettingsSectionLabel("REPORTS") }
         item { SettingsActionCard("Reports & insights", "Monthly trends, categories and cash flow", onReports, Icons.Default.Assessment) }
         item { SettingsSectionLabel("DATA MANAGEMENT") }
-        item { SettingsActionCard("Upload statements", "Import transactions from a CSV statement", onImportCsv, Icons.Default.FileUpload) }
+        item { SettingsActionCard("Import PDF bank statement", "Read password-protected PDF statements on this device", onImportPdf, Icons.Default.FileUpload) }
+        item { SettingsActionCard("Import CSV statement", "Import transactions from a CSV statement", onImportCsv, Icons.Default.FileUpload) }
         item { SettingsActionCard("Create encrypted backup", "Export accounts, transactions, budgets and reminders", onBackup, Icons.Default.Backup) }
         item { SettingsActionCard("Restore backup", "Restore finance data from an encrypted backup", onRestore, Icons.Default.Restore) }
         item { SettingsSectionLabel("CONNECTIONS") }
