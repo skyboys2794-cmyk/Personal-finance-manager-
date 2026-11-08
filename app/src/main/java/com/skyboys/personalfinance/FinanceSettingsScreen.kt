@@ -50,7 +50,7 @@ fun FinanceSettingsScreen(
         item { SettingsSectionLabel("AUTOMATION") }
         item { SettingsActionCard("Automatic transaction capture", "Capture selected payment notifications and categorize locally", onAutoCapture, Icons.Default.FileUpload) }
         item { SettingsSectionLabel("CONNECTIONS") }
-        item { SettingsActionCard("Google Sheets backup", "Export transactions, accounts, cards, budgets and bills to a readable spreadsheet", onSheets, Icons.Default.CloudUpload) }
+        item { SettingsActionCard("Google Sheets backup", "Create a new full backup sheet; linking and updating an existing sheet is the next step", onSheets, Icons.Default.CloudUpload) }
         item { SettingsSectionLabel("PERSONALIZATION") }
         item { SettingsActionCard("Customize dashboard", "Choose which overview sections are visible", onCustomize, Icons.Default.Palette) }
         item {
