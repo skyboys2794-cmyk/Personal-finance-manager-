@@ -29,7 +29,7 @@ object EncryptedBackup {
     fun export(data: FinanceBackupData, password: CharArray): ByteArray {
         require(password.size >= 10) { "Use a backup password of at least 10 characters" }
         try {
-            val root = JSONObject().put("format", "personal-finance-backup").put("version", 2)
+            val root = JSONObject().put("format", "personal-finance-backup").put("version", 3)
             root.put("transactions", JSONArray().apply {
                 data.transactions.forEach { t -> put(JSONObject()
                     .put("id", t.id).put("title", t.title).put("amountPaise", t.amountPaise)
@@ -63,7 +63,7 @@ object EncryptedBackup {
         val root = JSONObject(String(plain, Charsets.UTF_8))
         require(root.getString("format") == "personal-finance-backup") { "Unsupported backup format" }
         val version = root.getInt("version")
-        require(version in 1..2) { "Unsupported backup version" }
+        require(version in 1..3) { "Unsupported backup version" }
         val transactions = root.getJSONArray("transactions").objects().map { t ->
             FinanceTransaction(
                 id = if (version >= 2) t.optLong("id", 0) else 0,
