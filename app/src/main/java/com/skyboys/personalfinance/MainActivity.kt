@@ -165,7 +165,9 @@ private fun FinanceApp(dao: com.skyboys.personalfinance.data.FinanceDao) {
         when (tab) {
             0 -> Dashboard(Modifier.padding(padding), transactions, summary.incomePaise, summary.expensePaise, summary.netCashFlowPaise, summary.expenseByCategory)
             1 -> ActivityList(Modifier.padding(padding), transactions) { id -> scope.launch(Dispatchers.IO) { dao.delete(id) } }
-            tab == 2 -> AccountsList(Modifier.padding(padding), accounts, dao) { name, institution, type, balance ->\n                scope.launch(Dispatchers.IO) { dao.insertAccount(FinanceAccount(name = name, institution = institution, type = type, openingBalancePaise = (balance * 100).toLong())) }\n            }
+            tab == 2 -> AccountsList(Modifier.padding(padding), accounts, dao) { name, institution, type, balance ->
+                scope.launch(Dispatchers.IO) { dao.insertAccount(FinanceAccount(name = name, institution = institution, type = type, openingBalancePaise = (balance * 100).toLong())) }
+            }
             else -> ManagementScreen(dao)
         }
     }
@@ -309,10 +311,31 @@ private fun TransactionRow(transaction: FinanceTransaction, onDelete: (() -> Uni
 }
 
 @Composable
-private fun AccountsList(modifier: Modifier, accounts: List<FinanceAccount>) {
+private fun AccountsList(
+    modifier: Modifier,
+    accounts: List<FinanceAccount>,
+    dao: com.skyboys.personalfinance.data.FinanceDao,
+    onAdd: (String, String, String, Double) -> Unit
+) {
+    val transactions by dao.observeAll().collectAsStateWithLifecycle(initialValue = emptyList())
+    var addAccount by remember { mutableStateOf(false) }
+    val netWorth = remember(accounts, transactions) { FinanceAnalytics.netWorth(accounts, transactions) }
     LazyColumn(modifier.fillMaxSize(), contentPadding = PaddingValues(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        item { Text("Your accounts", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
-        item { Text("Cash, bank accounts and cards can be recorded separately. Manual tracking works without bank sync.", color = Muted) }
+        item {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("Your accounts", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                TextButton(onClick = { addAccount = true }) { Text("Add account") }
+            }
+        }
+        item {
+            Card(shape = RoundedCornerShape(18.dp), colors = CardDefaults.cardColors(containerColor = Mint)) {
+                Column(Modifier.padding(16.dp)) {
+                    Text("ESTIMATED NET WORTH", style = MaterialTheme.typography.labelMedium, color = Muted)
+                    Text(money(netWorth), style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = Forest)
+                }
+            }
+        }
+        item { Text("Track cash, bank accounts and credit cards manually. No bank connection is required.", color = Muted) }
         items(accounts, key = { it.id }) { account ->
             Card(shape = RoundedCornerShape(18.dp)) {
                 Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -326,6 +349,43 @@ private fun AccountsList(modifier: Modifier, accounts: List<FinanceAccount>) {
             }
         }
     }
+    if (addAccount) AddAccountDialog(onDismiss = { addAccount = false }) { name, institution, type, balance ->
+        onAdd(name, institution, type, balance)
+        addAccount = false
+    }
+}
+
+@Composable
+private fun AddAccountDialog(
+    onDismiss: () -> Unit,
+    onSave: (String, String, String, Double) -> Unit
+) {
+    var name by remember { mutableStateOf("") }
+    var institution by remember { mutableStateOf("") }
+    var type by remember { mutableStateOf("BANK") }
+    var balance by remember { mutableStateOf("0") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add account") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(name, { name = it }, label = { Text("Account name") }, singleLine = true)
+                OutlinedTextField(institution, { institution = it }, label = { Text("Bank / institution") }, singleLine = true)
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    listOf("BANK", "CASH", "CREDIT_CARD", "WALLET").forEach { item ->
+                        FilterChip(type == item, { type = item }, label = { Text(item) })
+                    }
+                }
+                OutlinedTextField(balance, { balance = it }, label = { Text("Opening balance (₹; debt can be negative)") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), singleLine = true)
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = name.isNotBlank() && balance.toDoubleOrNull()?.isFinite() == true, onClick = {
+                onSave(name.trim(), institution.trim(), type, balance.toDouble())
+            }) { Text("Save") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
 }
 
 @Composable
