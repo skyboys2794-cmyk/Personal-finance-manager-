@@ -1,35 +1,65 @@
 # Personal Finance Manager
 
-An offline-first Android app for tracking personal income and expenses.
+An offline-first Android personal-finance app. It is designed for manual entry
+and statement imports, so users can track multiple banks, cash wallets and
+credit cards without paid bank-sync APIs or sharing bank credentials.
 
-## Initial features
+## Implemented foundation
 
-- Record income and expenses in Indian rupees (₹).
-- View total balance, income, and expenses.
-- Categorize transactions.
-- Review and delete recent transactions.
-- Store transactions locally with Room; no account or server required.
-- Build a debug APK automatically through GitHub Actions.
+- Modern Material 3 dashboard with monthly income, spending, net cash flow and
+  category spending bars.
+- Manual income/expense entry with INR amounts, categories, tags, payment
+  methods and account association.
+- Local Room database with a versioned 1-to-2 migration.
+- Multiple account records (cash and bank account seed records on first launch).
+- CSV statement import with quoted-field parsing, header aliases, date parsing
+  and skipped-row reporting.
+- Password-encrypted portable transaction backups using PBKDF2-HMAC-SHA256
+  and AES-256-GCM; restore is supported from the app.
+- Monthly category analytics and net-worth calculation logic.
+- WorkManager bill reminder checks and threshold notification evaluator.
+- Google Sheets REST upload adapter; see integration status below.
+- GitHub Actions debug APK workflow.
 
-## Build the APK
+## Build and download
 
-The workflow runs on pushes to `main`, pull requests, and manual dispatches.
+The workflow runs on pushes to `main`, pull requests and manual dispatches.
 
 1. Open the repository's **Actions** tab.
 2. Select **Android debug APK**.
 3. Open the latest successful run.
 4. Download the `personal-finance-manager-debug-apk` artifact.
 
-The workflow uses JDK 17 and Gradle 8.9. The APK output is `app/build/outputs/apk/debug/app-debug.apk`.
+The build uses JDK 17 and Gradle 8.9. Local output:
+`app/build/outputs/apk/debug/app-debug.apk`.
 
-## Data and privacy
+## CSV import
 
-Transaction data is stored locally in the app's Room database. Android backup is disabled in this initial version. Do not add real financial records, passwords, API keys, or credentials to the Git repository.
+See [CSV import format](docs/CSV_IMPORT_FORMAT.md). Import is manual; the app
+does not connect to bank accounts or request bank passwords.
 
-## Planned enhancements
+## Backup and privacy
 
-- Monthly reports and charts.
-- CSV bank-statement import and export.
-- Multiple accounts and transfers.
-- Budget limits and recurring transactions.
-- Optional, user-configured cloud backup.
+Transaction backups are encrypted on-device before the user selects a file
+location. Use a strong password of at least 10 characters and keep it safe:
+there is no password recovery. The local Room database remains the primary
+source of truth. Android cloud backup is disabled.
+
+Google Sheets is optional and requires explicit user authorization. The REST
+adapter is implemented, but the in-app Google OAuth consent and sync screen
+still need to be connected to an app-specific OAuth client. Follow
+[Google Sheets setup](docs/GOOGLE_SHEETS_BACKUP.md). Never commit client
+secrets, access tokens, bank credentials or real financial data.
+
+## Architecture and next implementation steps
+
+- `data/`: Room entities, DAO and explicit database migration.
+- `importer/`: CSV parsing.
+- `backup/`: encrypted file backup and Google Sheets REST adapter.
+- `reports/`: monthly cash-flow and category analytics.
+- `notifications/`: bill reminder worker and budget threshold notification logic.
+
+The next UI milestone is full CRUD for accounts, budgets and bill reminders,
+plus a dedicated reports/settings area and Google OAuth consent flow. Dashboard
+widget preferences and account/card balance reconciliation also remain to be
+completed. Review imported bank CSV sign conventions before relying on totals.
