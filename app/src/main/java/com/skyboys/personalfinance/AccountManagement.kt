@@ -208,7 +208,7 @@ private fun AccountEditorDialog(account: FinanceAccount?, onDismiss: () -> Unit,
     var name by remember(account?.id) { mutableStateOf(account?.name.orEmpty()) }
     var institution by remember(account?.id) { mutableStateOf(account?.institution.orEmpty()) }
     var type by remember(account?.id) { mutableStateOf(account?.type ?: "BANK") }
-    var balance by remember(account?.id) { mutableStateOf((kotlin.math.abs(account?.openingBalancePaise ?: 0L) / 100.0).toString()) }
+    var balance by remember(account?.id) { mutableStateOf(((if (account?.type == "CREDIT_CARD") kotlin.math.abs(account.openingBalancePaise) else account?.openingBalancePaise ?: 0L) / 100.0).toString()) }
     var include by remember(account?.id) { mutableStateOf(account?.isIncludedInNetWorth ?: true) }
     var limit by remember(account?.id) { mutableStateOf(((account?.creditLimitPaise ?: 0L) / 100.0).toString()) }
     var dueDay by remember(account?.id) { mutableStateOf(if (account == null || account.statementDueDay == 0) "" else account.statementDueDay.toString()) }
